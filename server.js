@@ -81,6 +81,10 @@ pool.on("error", error => {
 
 const app = express();
 
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.disable("x-powered-by");
 app.use(helmet());
 app.use(express.json({ limit: "16kb" }));
@@ -112,26 +116,21 @@ app.use(session({
   }
 }));
 
-// Collect actual Bank and School observations.
 // ==================================================
 // 5. SAME-ORIGIN API PROTECTION
 // ==================================================
 
 app.use("/api", (req, res, next) => {
-  if (
-    ["GET", "HEAD", "OPTIONS"].includes(req.method)
-  ) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     return next();
   }
 
   const origin = req.get("origin");
 
   try {
-    if (
-      !origin ||
-      new URL(origin).origin !==
-      `${req.protocol}://${req.get("host")}`
-    ) {
+    const requestOrigin = `${req.protocol}://${req.get("host")}`;
+
+    if (!origin || new URL(origin).origin !== requestOrigin) {
       return res.status(403).json({
         error: "Invalid request origin"
       });
