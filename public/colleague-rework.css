@@ -1,0 +1,53 @@
+#acadia-dashboard .colleague-legacy-tabs{display:none!important}
+#acadia-dashboard .colleague-home{padding:12px 2px}
+#acadia-dashboard .colleague-home h2{font-size:1.25rem;margin:0 0 7px}
+#acadia-dashboard .colleague-home>p{font-size:.85rem;margin:0 0 15px}
+#acadia-dashboard .colleague-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#acadia-dashboard .colleague-tile{display:flex;align-items:center;gap:11px;text-align:left;min-height:72px;border:1px solid #cbd0d5;border-radius:3px;background:#fff;color:#134f88;padding:12px;cursor:pointer;font:inherit}
+#acadia-dashboard .colleague-tile:hover,#acadia-dashboard .colleague-tile:focus-visible{background:#f3f7fb;border-color:#2475bb}
+#acadia-dashboard .colleague-tile strong{display:block;font-size:.87rem;font-weight:600}
+#acadia-dashboard .colleague-tile small{display:block;color:#34475c;font-size:.7rem;line-height:1.35;margin-top:4px}
+#acadia-dashboard .colleague-symbol{display:grid;place-items:center;flex-shrink:0;width:38px;height:38px;border-radius:50%;background:#f0f1f3;font-size:20px}
+#acadia-dashboard .colleague-notice{margin-top:15px!important;color:#666}
+#acadia-dashboard .colleague-toolbar{display:flex;align-items:center;gap:15px;margin:10px 0 14px}
+#acadia-dashboard .colleague-toolbar[hidden],#acadia-dashboard .colleague-home[hidden]{display:none!important}
+#acadia-dashboard .colleague-toolbar button,#acadia-dashboard .colleague-course button,#acadia-dashboard .colleague-filters button{border:1px solid #2877b7;border-radius:20px;background:#fff;color:#125a95;padding:7px 12px;cursor:pointer}
+#acadia-dashboard .colleague-course button:disabled{opacity:.6;cursor:default}
+#acadia-dashboard .colleague-filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+#acadia-dashboard .colleague-filters input,#acadia-dashboard .colleague-filters select{flex:1;min-width:125px;max-width:100%;padding:8px;border:1px solid #aaa}
+#acadia-dashboard .colleague-course{border:1px solid #d1d4d8;padding:12px;margin:9px 0;background:#fff}
+#acadia-dashboard .colleague-course h4{font-size:.92rem;color:#164d83;margin:0 0 7px}
+#acadia-dashboard .colleague-course p{font-size:.8rem;margin:6px 0}
+#acadia-dashboard .colleague-course-meta{display:grid;grid-template-columns:100px minmax(0,1fr);gap:3px 8px;font-size:.75rem;margin:10px 0}
+#acadia-dashboard .colleague-course-meta dt{font-weight:bold}
+#acadia-dashboard .colleague-course-meta dd{margin:0}
+#acadia-dashboard .colleague-secondary{margin-left:8px}
+#acadia-dashboard .colleague-week{display:grid;grid-template-columns:repeat(5,minmax(105px,1fr));gap:5px;overflow-x:auto}
+#acadia-dashboard .colleague-week>div{background:#f5f5f5;border:1px solid #ddd;min-height:110px;padding:7px;font-size:.75rem}
+#acadia-dashboard .colleague-event{background:#e8f6f2;border:1px solid #079e99;margin-top:7px;padding:7px;overflow-wrap:anywhere}
+#acadia-dashboard .colleague-event small{display:block}
+@media(max-width:550px){#acadia-dashboard .colleague-grid{grid-template-columns:1fr}#acadia-dashboard .colleague-week{grid-template-columns:repeat(5,120px)}}
+#acadia-catalog > :not(.colleague-catalog),#acadia-planning > :not(.colleague-planning){display:none!important}
+
+/* Clearer student self-service cards and panel spacing */
+.colleague-grid{gap:14px!important}.colleague-tile{min-height:90px!important;padding:15px!important;border-radius:14px!important;text-align:left!important}.colleague-detail{padding:18px!important}.colleague-detail .school-course-row{margin:10px 0;padding:12px;border:1px solid #e8dfe3;border-radius:10px;line-height:1.6;overflow-wrap:anywhere}
+
+
+/* Organized, single-column student self-service navigation */
+#acadia-dashboard .colleague-home{padding:12px 8px 80px;max-width:100%;box-sizing:border-box}
+#acadia-dashboard .colleague-grid{display:flex!important;flex-direction:column;gap:18px!important}
+#acadia-dashboard .colleague-group{min-width:0}
+#acadia-dashboard .colleague-group h3{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:#8a1734;margin:0 0 8px 3px}
+#acadia-dashboard .colleague-group-list{display:flex;flex-direction:column;gap:8px}
+#acadia-dashboard .colleague-tile{width:100%;box-sizing:border-box;display:grid!important;grid-template-columns:36px minmax(0,1fr) 12px;gap:11px;align-items:center;min-height:66px!important;padding:11px!important;border-radius:12px!important}
+#acadia-dashboard .colleague-tile strong{font-size:.86rem;line-height:1.3}
+#acadia-dashboard .colleague-tile small{font-size:.72rem;line-height:1.4;overflow-wrap:break-word}
+#acadia-dashboard .colleague-symbol{width:34px;height:34px;font-size:17px}
+#acadia-dashboard .colleague-arrow{font-size:1.3rem;color:#8a1734}
+#acadia-dashboard .colleague-detail{padding:14px 10px 85px!important}
+#acadia-dashboard .bank-link-form{display:flex;flex-direction:column;gap:12px}
+#acadia-dashboard .bank-link-form label{display:flex;flex-direction:column;gap:5px;font-size:.8rem;font-weight:600}
+#acadia-dashboard .bank-link-form input{width:100%;box-sizing:border-box;padding:10px;border:1px solid #abb4bf;border-radius:8px}
+#acadia-dashboard .bank-link-form button{padding:11px;border-radius:9px;border:1px solid #8a1734;background:#8a1734;color:white}
+#acadia-dashboard .bank-link-form button[type=button]{background:white;color:#8a1734}
+#acadia-dashboard .bank-link-status{font-size:.8rem;overflow-wrap:anywhere}

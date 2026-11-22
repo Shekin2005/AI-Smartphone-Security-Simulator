@@ -1,0 +1,1193 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+  <title>AI Smartphone Security Simulator</title>
+  <link rel="stylesheet" href="./style.css">
+<script src="./app.js" defer></script>
+<script src="./acadia-roles.js" defer></script>
+<script src="./school-upgrade.js" defer></script>
+<script src="./school-services.js" defer></script>
+<script src="./colleague-rework.js" defer></script>
+<link rel="stylesheet" href="./school-upgrade.css">
+<link rel="stylesheet" href="./colleague-rework.css">
+  
+
+</head>
+<body>
+  <header class="page-header">
+    <h1>AI Smartphone Security Simulator</h1>
+    <p>3D Smartphone · Secure Accounts · AI Defender</p>
+  </header>
+
+  <main class="scene">
+    <div class="phone" id="phone">
+
+      <!-- PHYSICAL BUTTONS -->
+      <button id="volume-up"
+              class="side-button volume-up"
+              aria-label="Volume Up"></button>
+
+      <button id="volume-down"
+              class="side-button volume-down"
+              aria-label="Volume Down"></button>
+
+      <button id="power-button"
+              class="side-button power-button"
+              aria-label="Power"></button>
+
+      <div class="display">
+        <div class="dynamic-island"></div>
+
+        <div class="status-bar">
+          <span id="clock">12:00</span>
+          <span>●●● Wi-Fi ▰</span>
+        </div>
+
+        <!-- PHONE OFF -->
+        <section id="off"
+                 class="screen off-screen active">
+          <p>Press the side power button</p>
+        </section>
+
+        <!-- LOCK SCREEN -->
+        <section id="lock" class="screen lock-screen">
+          <div class="lock-content">
+            <div class="lock-symbol">🔒</div>
+            <h2 id="lock-time">12:00</h2>
+            <p id="lock-date"></p>
+          </div>
+
+          <button id="unlock-button"
+                  class="unlock-button">
+            Tap to Unlock
+          </button>
+        </section>
+
+        <!-- PHONE PASSCODE -->
+        <section id="password"
+                 class="screen password-screen">
+          <h3>Enter Phone Passcode</h3>
+
+          <div class="passcode-dots">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+
+          <p id="password-message"
+             aria-live="polite"></p>
+
+          <div class="keypad">
+            <button data-digit="1">1</button>
+            <button data-digit="2">2</button>
+            <button data-digit="3">3</button>
+            <button data-digit="4">4</button>
+            <button data-digit="5">5</button>
+            <button data-digit="6">6</button>
+            <button data-digit="7">7</button>
+            <button data-digit="8">8</button>
+            <button data-digit="9">9</button>
+            <button id="clear-pin">C</button>
+            <button data-digit="0">0</button>
+            <button id="delete-pin">⌫</button>
+          </div>
+
+          <p class="phone-hint">Phone demo PIN: 1234</p>
+        </section>
+
+        <!-- HOME SCREEN -->
+        <section id="home" class="screen home-screen">
+          <h2>My Smartphone</h2>
+
+          <div class="app-grid">
+            <button data-open="banking">
+              <span class="app-icon bank-icon">🏦</span>
+              Banking
+            </button>
+
+            <button data-open="university">
+              <span class="app-icon school-icon">🎓</span>
+              Acadia Student
+            </button>
+
+            <button data-open="defender">
+              <span class="app-icon defender-icon">🛡️</span>
+              AI Defender
+            </button>
+
+          </div>
+
+          <div class="dock">
+            <button data-open="phone-app"
+                    title="Phone">📞</button>
+            <button data-open="browser-app"
+                    title="Browser">🌐</button>
+            <button data-open="messages-app"
+                    title="Messages">💬</button>
+            <button data-open="camera-app"
+                    title="Camera">📷</button>
+          </div>
+        </section>
+
+        <!-- =====================================
+             BANKING
+        ====================================== -->
+        <section id="banking"
+                 class="screen app-screen banking-screen">
+
+          <header class="brand-header bank-header">
+            <div>
+              <strong>◆ Royal Banking</strong>
+              <small>Personal Banking</small>
+            </div>
+            <span class="demo-label">DEMO</span>
+          </header>
+
+          <!-- BANK LOGIN -->
+          <div id="bank-login" class="auth-panel">
+            <h2>Welcome Back</h2>
+            <p>Sign in to your simulator account.</p>
+
+            <label for="bank-username">Username</label>
+            <input id="bank-username"
+                   autocomplete="username"
+                   placeholder="Enter username">
+
+            <label for="bank-password">Password</label>
+            <div class="password-field">
+              <input id="bank-password"
+                     type="password"
+                     autocomplete="current-password"
+                     placeholder="Enter password">
+
+              <button type="button"
+                      data-toggle-password="bank-password"
+                      aria-label="Show password">👁</button>
+            </div>
+
+            <button class="action-button bank-action"
+                    data-login="bank">
+              Sign In
+            </button>
+
+            <p id="bank-login-message"
+               class="feedback"
+               aria-live="polite"></p>
+
+            <button class="text-button"
+                    data-auth-panel="bank:register">
+              Create a Banking Account
+            </button>
+          </div>
+
+          <!-- BANK REGISTRATION -->
+          <div id="bank-register"
+               class="auth-panel" hidden>
+            <h2>Create Banking Account</h2>
+
+            <label for="bank-register-username">
+              Username
+            </label>
+            <input id="bank-register-username"
+                   autocomplete="username"
+                   placeholder="Choose username">
+
+            <label for="bank-register-password">
+              Password
+            </label>
+            <input id="bank-register-password"
+                   type="password"
+                   autocomplete="new-password"
+                   placeholder="At least 12 characters">
+
+            <button class="action-button bank-action"
+                    data-register="bank">
+              Create Account
+            </button>
+
+            <p id="bank-register-message"
+               class="feedback"
+               aria-live="polite"></p>
+
+            <button class="text-button"
+                    data-auth-panel="bank:login">
+              Back to Sign In
+            </button>
+          </div>
+
+          <!-- BANK AUTHENTICATOR SETUP -->
+          <div id="bank-enroll"
+               class="auth-panel" hidden>
+            <h2>Set Up Authenticator</h2>
+
+            <p>
+              Scan this QR code with an authenticator
+              app, then enter its six-digit code.
+            </p>
+
+            <img id="bank-qr"
+                 class="auth-qr"
+                 alt="Banking authenticator QR code">
+
+            <p id="bank-manual-key"
+               class="manual-key"></p>
+
+            <button class="action-button bank-action"
+                    data-auth-panel="bank:otp">
+              Continue to Verification
+            </button>
+          </div>
+
+          <!-- BANK MFA -->
+          <div id="bank-otp" class="auth-panel" hidden>
+            <h2>Verify Your Identity</h2>
+
+            <p>
+              Enter the current six-digit code from
+              your authenticator app.
+            </p>
+
+            <label for="bank-otp-input">
+              Verification Code
+            </label>
+
+            <input id="bank-otp-input"
+                   inputmode="numeric"
+                   autocomplete="one-time-code"
+                   maxlength="6"
+                   placeholder="6-digit code">
+
+            <button class="action-button bank-action"
+                    data-verify="bank">
+              Verify
+            </button>
+
+            <p id="bank-otp-message"
+               class="feedback"
+               aria-live="polite"></p>
+
+            <button class="text-button"
+                    data-cancel="bank">
+              Cancel
+            </button>
+          </div>
+
+          <!-- BANK DASHBOARD -->
+          <div id="bank-dashboard" hidden>
+            <div class="dashboard-heading">
+              <div>
+                <p>Welcome to Royal Banking</p>
+                <h2>My Accounts</h2>
+              </div>
+
+              <button class="logout-button"
+                      data-logout="bank">
+                Log Out
+              </button>
+            </div>
+
+            <div class="account-card">
+              <p>Everyday Chequing •••• 1001</p>
+              <h2>$<span id="balance">—</span></h2>
+              <small>Available balance · CAD</small>
+            </div>
+
+            <div class="account-card savings-card">
+              <p>High Interest Savings •••• 2002</p>
+              <h2>$<span id="savings-balance">—</span></h2>
+              <small>Available balance · CAD</small>
+            </div>
+
+            <div class="quick-actions">
+              <button data-bank-panel="transfer">
+                ↗ Transfer
+              </button>
+              <button data-bank-panel="transactions">☷ Activity</button>
+              <button data-bank-panel="recipients">👥 Recipients</button>
+              <button data-bank-panel="tuition">🎓 Pay Tuition</button>
+              <button type="button" data-bank-panel="details">Account Details</button>
+            </div>
+
+            <div id="bank-details-panel" class="content-panel" hidden>
+              <h3>Account Details</h3>
+              <ul id="bank-account-numbers" aria-live="polite"></ul>
+              <button id="bank-generate-link" type="button" class="action-button bank-action">
+                Generate Verification Code
+              </button>
+              <p id="bank-link-output" class="feedback" aria-live="polite"></p>
+            </div>
+
+            <div id="bank-transfer-panel"
+                 class="content-panel">
+              <h3>Transfer Money</h3>
+
+              <label for="bank-from">From</label>
+              <select id="bank-from">
+                <option value="chequing">Chequing</option>
+                <option value="savings">Savings</option>
+              </select>
+
+              <label for="bank-to">To</label>
+              <select id="bank-to">
+                <option value="savings">Savings</option>
+                <option value="chequing">Chequing</option>
+              </select>
+
+              <label for="amount">Amount (CAD)</label>
+              <input id="amount"
+                     type="text"
+                     inputmode="decimal"
+                     placeholder="0.00">
+
+              <button id="transfer-button"
+                      class="action-button bank-action">
+                Confirm Demo Transfer
+              </button>
+
+              <p id="bank-message"
+                 class="feedback"
+                 aria-live="polite"></p>
+            </div>
+
+             <div id="bank-tuition-panel" class="content-panel" hidden>
+               <h3>Pay Acadia Tuition (Demo)</h3>
+               <label for="tuition-student-id">Simulator Student ID</label>
+               <input id="tuition-student-id" placeholder="AC00000001" maxlength="10">
+               <button id="tuition-lookup" type="button">Find Student</button>
+               <p id="tuition-student-info" class="feedback"></p>
+               <label for="tuition-from">Pay from</label>
+               <select id="tuition-from"><option value="chequing">Chequing</option><option value="savings">Savings</option></select>
+               <label for="tuition-amount">Amount (CAD)</label>
+               <input id="tuition-amount" inputmode="decimal" placeholder="25.00">
+               <button id="tuition-pay" class="action-button bank-action" type="button">Confirm Fictional Payment</button>
+               <p id="tuition-message" class="feedback" aria-live="polite"></p>
+             </div>
+
+            <div id="bank-recipients-panel" class="content-panel" hidden>
+              <h3>Add Banking Recipient</h3>
+              <label for="recipient-username">Recipient Banking username</label>
+              <input id="recipient-username" autocomplete="off" placeholder="Registered Banking username">
+              <button id="recipient-add" type="button" class="action-button bank-action">Add Recipient</button>
+              <p id="recipient-message" class="feedback" aria-live="polite"></p>
+              <h3>Saved Recipients</h3>
+              <ul id="recipient-list"></ul>
+              <label for="person-recipient">Send to</label>
+              <select id="person-recipient"></select>
+              <label for="person-from">Pay from</label>
+              <select id="person-from"><option value="chequing">Chequing</option><option value="savings">Savings</option></select>
+              <label for="person-amount">Amount (CAD)</label>
+              <input id="person-amount" type="text" inputmode="decimal" placeholder="25.00">
+              <button id="person-send" type="button" class="action-button bank-action">Confirm Fictional Transfer</button>
+              <p id="person-message" class="feedback" aria-live="polite"></p>
+            </div>
+
+            <div id="bank-transactions-panel"
+                 class="content-panel" hidden>
+              <h3>Recent Activity</h3>
+              <ul id="transactions"></ul>
+            </div>
+          </div>
+
+          <p class="disclaimer">
+            Fictional banking demonstration.
+            Not affiliated with Royal Bank of Canada.
+            No real funds are transferred.
+          </p>
+        </section>
+
+        <!-- =====================================
+             ACADIA STUDENT
+        ====================================== -->
+        <section id="university"
+                 class="screen app-screen acadia-screen">
+
+          <header class="brand-header acadia-header">
+            <div>
+              <strong>ACADIA</strong>
+              <small>Colleague-inspired Student Portal</small>
+            </div>
+            <span class="demo-label">DEMO</span>
+          </header>
+
+          
+<!-- ==========================================
+     ACADIA LOGIN - STUDENT OR ADMINISTRATOR
+========================================== -->
+
+<div id="acadia-login" class="auth-panel">
+
+  <h2>Acadia University Portal</h2>
+
+  <p>
+    Select your account type to continue.
+  </p>
+
+  <!-- ACCOUNT TYPE SELECTION -->
+  <div id="acadia-role-selection"
+       class="acadia-role-selection">
+
+    <button type="button"
+        class="acadia-role-card"
+        id="acadia-student-choice">
+      <span class="role-icon">🎓</span>
+      <strong>Student Login</strong>
+      <small>
+        Courses, grades, schedule,
+        tuition, graduation and profile
+      </small>
+    </button>
+
+    <button type="button"
+        class="acadia-role-card"
+        id="acadia-admin-choice">
+      <span class="role-icon">🛡️</span>
+      <strong>Administrator Login</strong>
+      <small>
+        Student records, grades,
+        courses, fees and approvals
+      </small>
+    </button>
+
+  </div>
+
+  <!-- STUDENT LOGIN FORM -->
+  <div id="acadia-student-login-form" hidden>
+
+    <h2>Student Sign In</h2>
+
+    <label for="acadia-username">
+      Student Username
+    </label>
+
+    <input id="acadia-username"
+           autocomplete="username"
+           placeholder="Enter username">
+
+    <label for="acadia-password">
+      Password
+    </label>
+
+    <div class="password-field">
+
+      <input id="acadia-password"
+             type="password"
+             autocomplete="current-password"
+             placeholder="Enter password">
+
+      <button type="button"
+              data-toggle-password="acadia-password"
+              aria-label="Show password">
+        👁
+      </button>
+
+    </div>
+
+    <button class="action-button acadia-action"
+            data-login="acadia">
+      Student Sign In
+    </button>
+
+    <p id="acadia-login-message"
+       class="feedback"
+       aria-live="polite"></p>
+
+    <button class="text-button"
+            data-auth-panel="acadia:register">
+      Create Student Account
+    </button>
+
+    <button type="button"
+        class="text-button"
+        id="acadia-student-back">
+  Back to Account Selection
+</button>
+
+  </div>
+
+  <!-- ADMINISTRATOR LOGIN FORM -->
+  <div id="acadia-admin-login-form" hidden>
+
+    <h2>Administrator Sign In</h2>
+
+    <p>
+      Authorized university staff only.
+    </p>
+
+    <label for="acadia-admin-username">
+      Administrator Username
+    </label>
+
+    <input id="acadia-admin-username"
+           autocomplete="username"
+           placeholder="Enter administrator username">
+
+    <label for="acadia-admin-password">
+      Password
+    </label>
+
+    <div class="password-field">
+
+      <input id="acadia-admin-password"
+             type="password"
+             autocomplete="current-password"
+             placeholder="Enter password">
+
+      <button type="button"
+              data-toggle-password="acadia-admin-password"
+              aria-label="Show password">
+        👁
+      </button>
+
+    </div>
+
+    <button type="button"
+            class="action-button acadia-action"
+            id="acadia-admin-login-button">
+      Administrator Sign In
+    </button>
+
+    <p id="acadia-admin-login-message"
+       class="feedback"
+       aria-live="polite"></p>
+
+    <button type="button"
+        class="text-button"
+        id="acadia-admin-create-choice">
+  Create Administrator Account
+</button>
+
+    <button type="button"
+        class="text-button"
+        id="acadia-admin-back">
+  Back to Account Selection
+</button>
+
+  </div>
+
+
+<!-- ===================================== -->
+<!-- ADMINISTRATOR MFA VERIFICATION SCREEN -->
+<!-- ===================================== -->
+
+<div id="acadia-admin-mfa" hidden>
+
+  <h2>Administrator Verification</h2>
+
+  <p>
+    If this is your first login, scan the QR code
+    using your authenticator app.
+  </p>
+
+  <img
+    id="acadia-admin-qr"
+    alt="Administrator authenticator QR code"
+    style="max-width:180px;"
+  >
+
+  <p id="acadia-admin-manual-key"></p>
+
+  <label for="acadia-admin-otp-input">
+    Six-Digit Authenticator Code
+  </label>
+
+  <input
+    id="acadia-admin-otp-input"
+    type="text"
+    inputmode="numeric"
+    maxlength="6"
+    autocomplete="one-time-code"
+    placeholder="123456"
+  >
+
+  <button
+    type="button"
+    id="acadia-admin-verify-button"
+  >
+    Verify Administrator
+  </button>
+
+  <p
+    id="acadia-admin-otp-message"
+    aria-live="polite"
+  ></p>
+
+</div>
+
+<!-- ADMINISTRATOR REGISTRATION -->
+<div id="acadia-admin-register-form" hidden>
+
+  <h2>Create Administrator Account</h2>
+  <p>Authorized setup code required.</p>
+
+  <label for="admin-register-username">
+    Administrator Username
+  </label>
+  <input id="admin-register-username"
+         autocomplete="username"
+         placeholder="Choose username">
+
+  <label for="admin-register-password">
+    Password
+  </label>
+  <input id="admin-register-password"
+         type="password"
+         autocomplete="new-password"
+         placeholder="At least 12 characters">
+
+  <button type="button"
+          class="action-button acadia-action"
+          id="admin-register-button">
+    Create Administrator Account
+  </button>
+
+  <p id="admin-register-message"
+     class="feedback"
+     aria-live="polite"></p>
+
+  <button type="button"
+          class="text-button"
+          id="admin-register-back">
+    Back to Administrator Login
+  </button>
+
+</div>
+
+
+<!-- ADMINISTRATOR AUTHENTICATOR SETUP -->
+<div id="acadia-admin-enroll-form" hidden>
+
+  <h2>Set Up Administrator Authenticator</h2>
+
+  <p>
+    Scan the QR code using Google Authenticator
+    or Microsoft Authenticator.
+  </p>
+
+  <img id="acadia-admin-qr"
+       class="auth-qr"
+       alt="Administrator authenticator QR code">
+
+  <p id="acadia-admin-manual-key"
+     class="manual-key"></p>
+
+  <label for="acadia-admin-otp-input">
+    Six-Digit Verification Code
+  </label>
+
+  <input id="acadia-admin-otp-input"
+         inputmode="numeric"
+         autocomplete="one-time-code"
+         maxlength="6"
+         placeholder="Enter 6-digit code">
+
+  <button type="button"
+          class="action-button acadia-action"
+          id="acadia-admin-verify-button">
+    Verify Authenticator
+  </button>
+
+  <p id="acadia-admin-otp-message"
+     class="feedback"
+     aria-live="polite"></p>
+
+</div>
+
+
+</div>
+
+          <!-- ACADIA REGISTRATION -->
+          <div id="acadia-register"
+               class="auth-panel" hidden>
+            <h2>Create Student Account</h2>
+
+            <label for="acadia-register-username">
+              Username
+            </label>
+            <input id="acadia-register-username"
+                   autocomplete="username"
+                   placeholder="Choose username">
+
+            <label for="acadia-register-password">
+              Password
+            </label>
+            <input id="acadia-register-password"
+                   type="password"
+                   autocomplete="new-password"
+                   placeholder="At least 12 characters">
+
+            <button class="action-button acadia-action"
+                    data-register="acadia">
+              Create Account
+            </button>
+
+            <p id="acadia-register-message"
+               class="feedback"
+               aria-live="polite"></p>
+
+            <button class="text-button"
+                    data-auth-panel="acadia:login">
+              Back to Sign In
+            </button>
+          </div>
+
+          <!-- ACADIA AUTHENTICATOR -->
+          <div id="acadia-enroll"
+               class="auth-panel" hidden>
+            <h2>Set Up Student Authenticator</h2>
+
+            <p>
+              Scan the QR code using your authenticator
+              app.
+            </p>
+
+            <img id="acadia-qr"
+                 class="auth-qr"
+                 alt="Student authenticator QR code">
+
+            <p id="acadia-manual-key"
+               class="manual-key"></p>
+
+            <button class="action-button acadia-action"
+                    data-auth-panel="acadia:otp">
+              Continue to Verification
+            </button>
+          </div>
+
+          <!-- ACADIA MFA -->
+          <div id="acadia-otp"
+               class="auth-panel" hidden>
+            <h2>Student Verification</h2>
+
+            <p>
+              Enter your authenticator's current
+              six-digit code.
+            </p>
+
+            <label for="acadia-otp-input">
+              Verification Code
+            </label>
+
+            <input id="acadia-otp-input"
+                   inputmode="numeric"
+                   autocomplete="one-time-code"
+                   maxlength="6"
+                   placeholder="6-digit code">
+
+            <button class="action-button acadia-action"
+                    data-verify="acadia">
+              Verify
+            </button>
+
+            <p id="acadia-otp-message"
+               class="feedback"
+               aria-live="polite"></p>
+
+            <button class="text-button"
+                    data-cancel="acadia">
+              Cancel
+            </button>
+          </div>
+
+          <!-- ACADIA DASHBOARD -->
+          <div id="acadia-dashboard" hidden>
+            <div class="dashboard-heading">
+              <div>
+                <p>Welcome, Student</p>
+                <h2>Student Dashboard</h2>
+              </div>
+
+              <button class="logout-button"
+                      data-logout="acadia">
+                Log Out
+              </button>
+            </div>
+
+            <p class="term-label">
+              Fall 2026 · Student Records
+            </p>
+
+            <div class="acadia-tabs">
+              <button data-tab="courses" class="active">
+                Courses
+              </button>
+              <button data-tab="grades">Grades</button>
+              <button data-tab="schedule">Schedule</button>
+              <button data-tab="finance">Finance</button>
+              <button data-tab="profile">Profile</button>
+              <button data-tab="graduation">Graduation</button>
+              <button data-tab="degree">Degree</button>
+            </div>
+
+            <div id="acadia-courses"
+                 class="content-panel"></div>
+
+            <div id="acadia-grades"
+                 class="content-panel" hidden></div>
+
+            <div id="acadia-schedule"
+                 class="content-panel" hidden>
+              <h3>Weekly Schedule</h3>
+              <p>
+                Schedule records are not yet supplied
+                by the backend.
+              </p>
+            </div>
+
+            <div id="acadia-finance"
+                 class="content-panel" hidden></div>
+
+            <div id="acadia-profile"
+                 class="content-panel" hidden></div>
+            
+<!-- GRADUATION -->
+<div id="acadia-graduation"
+     class="content-panel" hidden>
+  <h3>Graduation Application</h3>
+  <p>Review graduation eligibility and application status.</p>
+  <button type="button" class="action-button acadia-action"
+          id="acadia-apply-graduation">
+    Apply for Graduation
+  </button>
+  <p id="acadia-graduation-message" class="feedback"></p>
+</div>
+
+<!-- DEGREE PROGRESS -->
+<div id="acadia-degree"
+     class="content-panel" hidden>
+  <h3>Degree Progress</h3>
+  <p id="acadia-degree-progress">
+    Degree progress is not yet available.
+  </p>
+  <h3>Degree Change Request</h3>
+  <label for="acadia-degree-request">Requested Degree</label>
+  <input id="acadia-degree-request"
+         placeholder="Enter requested degree">
+  <button type="button" class="action-button acadia-action"
+          id="acadia-submit-degree-request">
+    Submit Request
+  </button>
+  <p id="acadia-degree-message" class="feedback"></p>
+</div>
+
+          </div>
+
+<!-- ==========================================
+     ACADIA ADMINISTRATOR DASHBOARD
+========================================== -->
+
+<div id="acadia-admin-dashboard" hidden>
+  <div class="dashboard-heading"><div><p>University Administration · Simulator</p><h2>Admin Dashboard</h2></div><button type="button" class="logout-button" id="acadia-admin-logout">Log Out</button></div>
+  <div id="ac-admin-root" class="ac-admin-root"><p>Loading administration console…</p></div>
+  <p id="acadia-admin-status" class="feedback" role="status"></p>
+</div>
+          <p class="disclaimer">
+            Fictional student records. This is not the
+            official Acadia University portal.
+          </p>
+        </section>
+
+        <!-- =====================================
+             AI DEFENDER
+        ====================================== -->
+        
+<!-- ==========================================
+     AI DEFENDER DASHBOARD
+========================================== -->
+
+<section id="defender"
+         class="screen app-screen dark-app defender-screen">
+
+    <!-- Dashboard heading -->
+    <header class="defender-heading">
+        <div>
+            <h2>🛡️ AI Defender</h2>
+        </div>
+
+        <span id="defender-status-badge"
+              class="defender-badge">
+            CHECKING
+        </span>
+    </header>
+
+    <!-- AI Defender ON/OFF -->
+    <div class="defender-panel">
+
+        <div class="defender-switch-row">
+            <div>
+                <strong>Attack Protection</strong>
+                <p>Save your protection preference</p>
+            </div>
+
+            <label class="defender-switch"
+                   aria-label="Enable AI Defender">
+
+                <input type="checkbox"
+                       id="defender-toggle"
+                       checked>
+
+                <span class="defender-switch-track"></span>
+            </label>
+        </div>
+
+        <p id="defender-toggle-message"
+           role="status">
+            Checking Defender status...
+        </p>
+    </div>
+
+    <!-- Attack statistics -->
+    <div class="defender-stats"
+         aria-label="Attack statistics">
+
+        <div class="defender-stat">
+            <small>Attacks</small>
+            <strong id="attack-count">0</strong>
+        </div>
+
+        <div class="defender-stat">
+            <small>Blocked</small>
+            <strong id="blocked-count">0</strong>
+        </div>
+
+        <div class="defender-stat">
+            <small>Succeeded</small>
+            <strong id="succeeded-count">0</strong>
+        </div>
+
+    </div>
+
+    <!-- Attack activity heading -->
+    <div class="defender-activity-heading">
+        <h3>Recorded Attack Activity</h3>
+
+        <button id="refresh-security"
+                class="defender-refresh"
+                type="button">
+            ↻ Refresh
+        </button>
+    </div>
+
+    <!-- Backend connection status -->
+    <p id="security-status"
+       class="defender-substatus"
+       role="status">
+        Waiting for authenticated session
+    </p>
+
+    <!-- JavaScript inserts attack cards here -->
+    <div id="security-logs"
+         aria-live="polite"></div>
+
+    <p class="note">
+        Historical simulator incidents.
+    </p>
+
+</section>
+
+
+        <!-- =====================================
+             PHONE AND CONTACTS
+        ====================================== -->
+        <section id="phone-app"
+                 class="screen app-screen dark-app">
+          <h2>📞 Phone & Contacts</h2>
+
+          <label for="contact-name">Contact Name</label>
+          <input id="contact-name"
+                 placeholder="Enter name">
+
+          <label for="contact-number">Phone Number</label>
+          <input id="contact-number"
+                 type="tel"
+                 placeholder="Enter phone number">
+
+          <button id="save-contact"
+                  class="primary-button">
+            Save Contact
+          </button>
+
+          <p id="contact-message"></p>
+
+          <h3>My Contacts</h3>
+          <div id="contacts-list"></div>
+
+          <h3>Dial Number</h3>
+          <input id="dial-number"
+                 type="tel"
+                 placeholder="Enter number">
+
+          <button id="dial-button"
+                  class="primary-button">
+            Call
+          </button>
+
+          <button id="end-call"
+                  class="danger-button">
+            End Call
+          </button>
+
+          <p id="call-status"></p>
+        </section>
+
+        <!-- =====================================
+             BROWSER
+        ====================================== -->
+        <section id="browser-app"
+                 class="screen app-screen dark-app">
+          <h2>🌐 Browser</h2>
+
+          <input id="browser-address"
+                 placeholder="https://example.com">
+
+          <button id="open-website"
+                  class="primary-button">
+            Open Website
+          </button>
+
+          <p id="browser-message"></p>
+          <p class="note">
+            Websites open in a separate browser tab.
+          </p>
+        </section>
+
+        <!-- =====================================
+             MESSAGES
+        ====================================== -->
+        <section id="messages-app"
+                 class="screen app-screen dark-app">
+          <h2>💬 Messages</h2>
+
+          <label for="message-recipient">
+            Select Contact
+          </label>
+
+          <select id="message-recipient"></select>
+
+          <div id="message-conversation"
+               class="message-conversation"></div>
+
+          <input id="message-input"
+                 placeholder="Type a message">
+
+          <button id="send-message"
+                  class="primary-button">
+            Send Message
+          </button>
+
+          <p id="message-status"></p>
+
+          <p class="note">
+            Messages and replies are simulated.
+          </p>
+        </section>
+
+        <!-- =====================================
+             CAMERA
+        ====================================== -->
+        <section id="camera-app"
+                 class="screen app-screen dark-app">
+          <h2>📷 Camera</h2>
+
+          <video id="camera-preview"
+                 autoplay muted playsinline></video>
+
+          <canvas id="camera-canvas" hidden></canvas>
+
+          <button id="start-camera"
+                  class="primary-button">
+            Start Camera
+          </button>
+
+          <button id="take-photo"
+                  class="primary-button">
+            Take Photo
+          </button>
+
+          <button id="stop-camera"
+                  class="danger-button">
+            Stop Camera
+          </button>
+
+          <img id="captured-photo"
+               alt="Captured photo"
+               hidden>
+
+          <a id="download-photo"
+             download="simulator-photo.png"
+             hidden>
+            Download Photo
+          </a>
+
+          <p id="camera-message"></p>
+        </section>
+
+        <!-- RECENT APPS -->
+        <section id="recent-apps"
+                 class="screen app-screen dark-app">
+          <h2>Recent Applications</h2>
+          <div id="recent-app-list"></div>
+        </section>
+
+        <!-- VOLUME OVERLAY -->
+        <div id="volume-overlay"
+             class="volume-overlay">
+          🔊
+          <div class="volume-track">
+            <div id="volume-fill"
+                 class="volume-fill"></div>
+          </div>
+          <span id="volume-percent">50%</span>
+        </div>
+
+        <!-- POWER MENU -->
+        <div id="power-menu"
+             class="power-menu hidden">
+          <h3>Power Options</h3>
+
+          <button id="power-off-option"
+                  class="danger-button">
+            Power Off
+          </button>
+
+          <button id="restart-option"
+                  class="primary-button">
+            Restart
+          </button>
+
+          <button id="cancel-power"
+                  class="primary-button">
+            Cancel
+          </button>
+        </div>
+
+        <!-- NAVIGATION -->
+        <nav class="navigation-area">
+          <button id="back-button"
+                  aria-label="Back">‹</button>
+
+          <button id="home-button"
+                  aria-label="Home">━</button>
+
+          <button id="recent-button"
+                  aria-label="Recent Apps">▢</button>
+        </nav>
+
+      </div>
+    </div>
+
+    <div class="floor-shadow"></div>
+  </main>
+
+  <p class="page-footer">
+    Local educational simulator — not a real bank
+    or university service.
+  </p>
+<link rel="stylesheet" href="/admin-console.css">
+<script defer src="/admin-console.js"></script>
+</body>
+</html>

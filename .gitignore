@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+ai-service/.venv/
+.venv/
+__pycache__/
+*.pyc
+*.log
+*.dump
+backups/
