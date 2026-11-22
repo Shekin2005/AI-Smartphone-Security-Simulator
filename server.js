@@ -1590,11 +1590,11 @@ const port = Number(
 
 pool.query("SELECT 1")
   .then(() => {
-    app.listen(port, process.env.HOST || "127.0.0.1", () => {
+    app.listen(port, process.env.HOST || "0.0.0.0", () => {
       console.log("================================");
       console.log("AI SMARTPHONE SECURITY SIMULATOR");
       console.log("================================");
-      console.log(`Open http://localhost:${port}`);
+      console.log(`Server listening on 0.0.0.0:${port}`);
       console.log("PostgreSQL-backed sessions enabled");
       console.log("Banking and Acadia authentication enabled");
       console.log("MFA authentication enabled");
