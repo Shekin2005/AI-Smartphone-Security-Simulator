@@ -128,7 +128,9 @@ app.use("/api", (req, res, next) => {
   const origin = req.get("origin");
 
   try {
-    const requestOrigin = `${req.protocol}://${req.get("host")}`;
+    const requestOrigin =
+  process.env.PUBLIC_ORIGIN ||
+  `${req.protocol}://${req.get("host")}`;
 
     if (!origin || new URL(origin).origin !== requestOrigin) {
       return res.status(403).json({
