@@ -75,11 +75,11 @@ How each was established:
 Both engines agreed on the most important item and neither produced a false
 positive. The difference is coverage.
 
-**Agreement - the IDOR.** The AI chose to request
-`/api/bank/tuition/student/AC00000063` and received HTTP 200 with a student
-record. The manual engine reached the same endpoint by walking the identifier
-range. Both are correct; the AI got there in fewer requests because it followed
-the hint in its prompt rather than enumerating.
+**Agreement - the IDOR.** The AI chose to request the tuition endpoint itself and
+received HTTP 200 for 2 student records (AC00000063, AC00000050). Those records belong to acadia student accounts, not to the bank user.
+The manual engine reached the same endpoint by walking the identifier range.
+Both are correct; the AI reached it sooner because it followed the hint in its
+prompt instead of enumerating the whole range.
 
 **Where the AI fell short.** It missed the two findings that need a
 *measurement over time* rather than a single response:
@@ -128,4 +128,4 @@ npm run ai                    # AI engine      -> AI-AGENT-FINDINGS.json
 node tools/compare-engines.mjs # this comparison
 ```
 
-Generated 2026-11-23T22:12:46.913Z.
+Generated 2026-11-23T22:13:14.866Z.
