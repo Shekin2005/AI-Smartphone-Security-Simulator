@@ -85,6 +85,13 @@ services:
       # defaults only apply when nothing more specific is set below.
       LLM_PREFLIGHT_TIMEOUT: ${LLM_PREFLIGHT_TIMEOUT:-180}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-600}
+      # Smaller models answer a turn with reasoning or prose and never emit a
+      # tool call, so Strix loops through planning tools without ever touching
+      # the target. This setting makes Strix send tool_choice="required",
+      # forcing a real tool call on every turn. It only applies to openai/-style
+      # routes, which is exactly how this stack addresses OpenAI-compatible
+      # endpoints.
+      STRIX_FORCE_REQUIRED_TOOL_CHOICE: ${STRIX_FORCE_REQUIRED_TOOL_CHOICE:-true}
 
     volumes:
       # Strix launches one sandbox container per scan, so it needs the
