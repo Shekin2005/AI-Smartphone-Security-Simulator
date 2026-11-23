@@ -8,7 +8,8 @@
     "check:js": "node --check server.js && node --check public/app.js",
     "pentest": "node tools/pentest-suite.mjs",
     "ai": "node tools/ai-agent.mjs",
-    "pentest:all": "node tools/pentest-suite.mjs && node tools/ai-agent.mjs"
+    "compare": "node tools/compare-engines.mjs",
+    "pentest:all": "node tools/pentest-suite.mjs && node tools/ai-agent.mjs && node tools/compare-engines.mjs"
   },
   "engines": {
     "node": ">=20"
