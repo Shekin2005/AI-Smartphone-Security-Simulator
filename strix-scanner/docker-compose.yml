@@ -1,0 +1,50 @@
+# ==================================================
+# STRIX SCAN SERVICE
+# ==================================================
+# Start from this folder:
+#   docker compose up --build
+#
+# The simulator itself keeps running on the host via `npm start`.
+# ==================================================
+
+services:
+  scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-smartphone-strix-scanner:1.0.0
+    container_name: strix-scanner
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    environment:
+      # Where the agent should attack. The simulator listens on the host.
+      TARGET_BASE: http://host.docker.internal:3000
+      RUNS_DIR: /data/runs
+      UPLOAD_DIR: /data/uploads
+      # Optional defaults; the console normally supplies these per scan.
+      STRIX_LLM: ${STRIX_LLM:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      # Shared secret. Set it in a local .env next to this file when the
+      # scanner is exposed through a tunnel or public VM. Render must carry
+      # the identical value as STRIX_SCAN_TOKEN.
+      STRIX_SCAN_TOKEN: ${STRIX_SCAN_TOKEN:-}
+
+    volumes:
+      # Strix needs a live daemon to launch its sandbox container.
+      # This mounts the host socket (docker-outside-of-docker).
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Scan workspaces and artifacts survive container rebuilds.
+      - strix-runs:/data/runs
+      - strix-uploads:/data/uploads
+
+    extra_hosts:
+      # Makes host.docker.internal resolve on Linux as well as
+      # Docker Desktop on Windows/macOS.
+      - "host.docker.internal:host-gateway"
+
+    restart: unless-stopped
+
+volumes:
+  strix-runs:
+  strix-uploads:

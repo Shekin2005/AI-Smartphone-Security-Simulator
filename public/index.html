@@ -902,10 +902,11 @@
 <section id="defender"
          class="screen app-screen dark-app defender-screen">
 
-    <!-- Dashboard heading -->
-    <header class="defender-heading">
-        <div>
-            <h2>🛡️ AI Defender</h2>
+    <!-- HEADER -->
+    <header class="sx-head">
+        <div class="sx-head-left">
+            <h2>AI DEFENDER</h2>
+            <span class="sx-head-sub">strix scan console</span>
         </div>
 
         <span id="defender-status-badge"
@@ -914,78 +915,322 @@
         </span>
     </header>
 
-    <!-- AI Defender ON/OFF -->
-    <div class="defender-panel">
+    <!-- ==========================================
+         PROTECTION + ACTIVITY (collapsed by default)
+         These IDs are bound by app.js at load time, so they
+         must stay in the DOM. The strip is hidden with
+         [hidden], never removed.
+    =========================================== -->
+    <button id="sx-strip-toggle"
+            class="sx-strip-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="sx-strip">
+        <span class="sx-strip-caret">&#9656;</span>
+        <span>protection &amp; activity</span>
+    </button>
 
-        <div class="defender-switch-row">
-            <div>
-                <strong>Attack Protection</strong>
-                <p>Save your protection preference</p>
+    <div id="sx-strip"
+         class="sx-strip"
+         hidden>
+
+        <div class="defender-panel sx-panel">
+
+            <div class="defender-switch-row">
+                <div>
+                    <strong>Attack Protection</strong>
+                    <p>Save your protection preference</p>
+                </div>
+
+                <label class="defender-switch"
+                       aria-label="Enable AI Defender">
+
+                    <input type="checkbox"
+                           id="defender-toggle"
+                           checked>
+
+                    <span class="defender-switch-track"></span>
+                </label>
             </div>
 
-            <label class="defender-switch"
-                   aria-label="Enable AI Defender">
+            <p id="defender-toggle-message"
+               role="status">
+                Checking Defender status...
+            </p>
+        </div>
 
-                <input type="checkbox"
-                       id="defender-toggle"
-                       checked>
+        <div class="defender-stats"
+             aria-label="Attack statistics">
 
-                <span class="defender-switch-track"></span>
+            <div class="defender-stat">
+                <small>Attacks</small>
+                <strong id="attack-count">0</strong>
+            </div>
+
+            <div class="defender-stat">
+                <small>Blocked</small>
+                <strong id="blocked-count">0</strong>
+            </div>
+
+            <div class="defender-stat">
+                <small>Succeeded</small>
+                <strong id="succeeded-count">0</strong>
+            </div>
+
+        </div>
+
+        <div class="defender-activity-heading">
+            <h3>Recorded Attack Activity</h3>
+
+            <button id="refresh-security"
+                    class="defender-refresh"
+                    type="button">
+                ↻ Refresh
+            </button>
+        </div>
+
+        <p id="security-status"
+           class="defender-substatus"
+           role="status">
+            Waiting for authenticated session
+        </p>
+
+        <div id="security-logs"
+             aria-live="polite"></div>
+    </div>
+
+    <!-- ==========================================
+         01 MODEL
+    =========================================== -->
+    <section class="sx-block">
+        <p class="sx-label"><span class="sx-num">01</span> MODEL</p>
+
+        <div class="sx-grid2">
+            <label class="sx-field">
+                <span>PROVIDER</span>
+                <select id="sx-provider">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="groq">Groq</option>
+                    <option value="google">Google</option>
+                    <option value="custom">Custom / local</option>
+                </select>
+            </label>
+
+            <label class="sx-field">
+                <span>MODEL</span>
+                <input id="sx-model"
+                       type="text"
+                       placeholder="gpt-4o-mini"
+                       autocomplete="off"
+                       spellcheck="false">
             </label>
         </div>
 
-        <p id="defender-toggle-message"
-           role="status">
-            Checking Defender status...
+        <label class="sx-field">
+            <span>API KEY</span>
+            <input id="sx-key"
+                   type="password"
+                   placeholder="sk-..."
+                   autocomplete="new-password"
+                   spellcheck="false">
+        </label>
+
+        <label class="sx-field">
+            <span>BASE URL <em>optional &middot; for local or custom endpoints</em></span>
+            <input id="sx-baseurl"
+                   type="text"
+                   placeholder="http://localhost:11434/v1"
+                   autocomplete="off"
+                   spellcheck="false">
+        </label>
+    </section>
+
+    <!-- ==========================================
+         02 TARGET
+    =========================================== -->
+    <section class="sx-block">
+        <p class="sx-label"><span class="sx-num">02</span> TARGET</p>
+
+        <div class="sx-targets">
+            <button type="button" class="sx-target" data-target="bank">
+                BANK APP<small>built-in simulator</small>
+            </button>
+
+            <button type="button" class="sx-target" data-target="school">
+                SCHOOL APP<small>built-in simulator</small>
+            </button>
+
+            <button type="button" class="sx-target" data-target="both">
+                BOTH APPS<small>bank + school</small>
+            </button>
+
+            <button type="button" class="sx-target" data-target="url">
+                URL<small>website</small>
+            </button>
+
+            <button type="button" class="sx-target" data-target="github">
+                GITHUB<small>repository</small>
+            </button>
+
+            <button type="button" class="sx-target" data-target="api-spec">
+                API SPEC<small>openapi / swagger</small>
+            </button>
+
+            <button type="button" class="sx-target" data-target="source">
+                ZIP SOURCE<small>vs code project</small>
+            </button>
+        </div>
+
+        <div id="sx-target-fields"></div>
+
+        <details class="sx-help">
+            <summary>how to upload</summary>
+
+            <ol>
+                <li>
+                    <b>BANK / SCHOOL / BOTH</b> need no upload. The scanner
+                    attacks the simulator you are already running.
+                </li>
+                <li>
+                    <b>URL</b> &mdash; paste a full address starting with
+                    http:// or https://.
+                </li>
+                <li>
+                    <b>GITHUB</b> &mdash; paste the repository address, for
+                    example https://github.com/owner/repo. A public repo
+                    needs no login.
+                </li>
+                <li>
+                    <b>API SPEC</b> &mdash; upload a .json or .yaml OpenAPI
+                    document.
+                </li>
+                <li>
+                    <b>ZIP SOURCE (VS Code)</b> &mdash; a browser cannot read a
+                    folder from your disk. Zip it first: in File Explorer
+                    right-click the project folder &rarr; Send to &rarr;
+                    Compressed (zipped) folder. Then upload that .zip here.
+                </li>
+            </ol>
+        </details>
+    </section>
+
+    <!-- ==========================================
+         03 RUN
+    =========================================== -->
+    <section class="sx-block">
+        <p class="sx-label"><span class="sx-num">03</span> RUN</p>
+
+        <div class="sx-grid2">
+            <label class="sx-field">
+                <span>MODE</span>
+                <select id="sx-mode">
+                    <option value="quick">Quick</option>
+                    <option value="standard">Standard</option>
+                    <option value="deep">Deep</option>
+                </select>
+            </label>
+
+            <label class="sx-field">
+                <span>MAX SPEND USD</span>
+                <input id="sx-budget"
+                       type="text"
+                       value="1"
+                       autocomplete="off">
+            </label>
+        </div>
+
+        <div class="sx-actions">
+            <button id="sx-start"
+                    class="sx-btn sx-btn-primary"
+                    type="button">
+                START SCAN
+            </button>
+
+            <button id="sx-cancel"
+                    class="sx-btn sx-btn-danger"
+                    type="button"
+                    disabled>
+                CANCEL
+            </button>
+        </div>
+
+        <p id="sx-run-error"
+           class="sx-error"
+           hidden></p>
+    </section>
+
+    <!-- ==========================================
+         04 PROGRESS
+    =========================================== -->
+    <section class="sx-block">
+        <p class="sx-label">
+            <span class="sx-num">04</span> PROGRESS
+            <span id="sx-timer"
+                  class="sx-timer">00:00</span>
         </p>
-    </div>
 
-    <!-- Attack statistics -->
-    <div class="defender-stats"
-         aria-label="Attack statistics">
+        <p id="sx-status-line"
+           class="sx-status">
+            idle
+        </p>
 
-        <div class="defender-stat">
-            <small>Attacks</small>
-            <strong id="attack-count">0</strong>
+        <pre id="sx-log"
+             class="sx-log"></pre>
+    </section>
+
+    <!-- ==========================================
+         05 REPORT
+    =========================================== -->
+    <section class="sx-block">
+        <p class="sx-label"><span class="sx-num">05</span> REPORT</p>
+
+        <p id="sx-took"
+           class="sx-took">
+            no report yet
+        </p>
+
+        <div id="sx-counts"
+             class="sx-counts">
+            <span data-sev="critical">critical <b>0</b></span>
+            <span data-sev="high">high <b>0</b></span>
+            <span data-sev="medium">medium <b>0</b></span>
+            <span data-sev="low">low <b>0</b></span>
         </div>
 
-        <div class="defender-stat">
-            <small>Blocked</small>
-            <strong id="blocked-count">0</strong>
+        <div class="sx-downloads">
+            <button type="button" data-kind="md" disabled>MD</button>
+            <button type="button" data-kind="json" disabled>JSON</button>
+            <button type="button" data-kind="csv" disabled>CSV</button>
+            <button type="button" data-kind="pdf" disabled>PDF</button>
         </div>
 
-        <div class="defender-stat">
-            <small>Succeeded</small>
-            <strong id="succeeded-count">0</strong>
+        <pre id="sx-report"
+             class="sx-report">No report yet. Start a scan.</pre>
+    </section>
+
+    <!-- ==========================================
+         06 ASK ABOUT THIS REPORT
+    =========================================== -->
+    <section class="sx-block sx-chat">
+        <p class="sx-label"><span class="sx-num">06</span> ASK ABOUT THIS REPORT</p>
+
+        <div id="sx-chat-log"
+             class="sx-chat-log"></div>
+
+        <div class="sx-chat-input">
+            <textarea id="sx-chat-q"
+                      rows="2"
+                      placeholder="Ask anything about this report..."></textarea>
+
+            <button id="sx-chat-send"
+                    class="sx-btn sx-btn-primary"
+                    type="button">
+                ASK
+            </button>
         </div>
-
-    </div>
-
-    <!-- Attack activity heading -->
-    <div class="defender-activity-heading">
-        <h3>Recorded Attack Activity</h3>
-
-        <button id="refresh-security"
-                class="defender-refresh"
-                type="button">
-            ↻ Refresh
-        </button>
-    </div>
-
-    <!-- Backend connection status -->
-    <p id="security-status"
-       class="defender-substatus"
-       role="status">
-        Waiting for authenticated session
-    </p>
-
-    <!-- JavaScript inserts attack cards here -->
-    <div id="security-logs"
-         aria-live="polite"></div>
-
-    <p class="note">
-        Historical simulator incidents.
-    </p>
+    </section>
 
 </section>
 
@@ -1189,5 +1434,7 @@
   </p>
 <link rel="stylesheet" href="/admin-console.css">
 <script defer src="/admin-console.js"></script>
+<link rel="stylesheet" href="/defender-console.css">
+<script defer src="/defender-console.js"></script>
 </body>
 </html>

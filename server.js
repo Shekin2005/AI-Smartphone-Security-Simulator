@@ -2,6 +2,8 @@ import { installSchoolServices } from "./school-services-routes.js";
 import { installSchoolRoutes } from "./school-routes.js";
 
 import "dotenv/config";
+// Imported after dotenv so STRIX_SCANNER_URL is already loaded.
+import { installStrixProxy } from "./strix-proxy-routes.js";
 import express from "express";
 import helmet from "helmet";
 import pg from "pg";
@@ -1566,6 +1568,10 @@ app.get("/api/security/defender/events", requireDefenderSession, async (req, res
 
 installSchoolRoutes(app, pool, requireAcadiaRole);
 installSchoolServices(app, pool, requireAcadiaRole);
+
+// Same-origin bridge to the Strix scanner. Mounted after sessions so
+// the scan API is gated on a signed-in, MFA-verified user.
+installStrixProxy(app);
 
 // ==================================================
 // 27. SERVE SMARTPHONE FRONTEND
