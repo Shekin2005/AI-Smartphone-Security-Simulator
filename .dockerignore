@@ -13,7 +13,4 @@ backups
 *.log
 *.dump
 
-# the scanner builds from its own directory
-strix-scanner
-
 *.md

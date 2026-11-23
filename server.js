@@ -2,14 +2,14 @@ import { installSchoolServices } from "./school-services-routes.js";
 import { installSchoolRoutes } from "./school-routes.js";
 
 import "dotenv/config";
-// Imported after dotenv so STRIX_SCANNER_URL is already loaded.
-import { installStrixProxy } from "./strix-proxy-routes.js";
 import express from "express";
 import helmet from "helmet";
 import pg from "pg";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import argon2 from "argon2";
+import { spawn } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import { rateLimit } from "express-rate-limit";
@@ -1599,9 +1599,134 @@ app.get("/api/security/defender/events", requireDefenderSession, async (req, res
 installSchoolRoutes(app, pool, requireAcadiaRole);
 installSchoolServices(app, pool, requireAcadiaRole);
 
-// Same-origin bridge to the Strix scanner. Mounted after sessions so
-// the scan API is gated on a signed-in, MFA-verified user.
-installStrixProxy(app);
+// ==================================================
+// AI AGENT - runs the thin 3-tool agent server-side
+// ==================================================
+// This is the same script exposed as `npm run ai` on the command line, so the
+// web console and the terminal produce identical results. The design is
+// deliberately minimal: a general-purpose scanner hands its model roughly 44
+// tools, and free models given that many choices spend every turn on planning
+// tools such as create_todo and get_threat_model without ever issuing an
+// attack. This agent offers three, which a small model can actually choose
+// between.
+//
+// Output is streamed as Server-Sent Events so the panel shows progress live.
+// Requires a signed-in, MFA-verified session, because it spawns a process.
+app.get("/api/ai-agent/run", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({
+      error: "Sign in as a lab user before running the agent"
+    });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  if (typeof res.flushHeaders === "function") {
+    res.flushHeaders();
+  }
+
+  const steps = Math.max(
+    1,
+    Math.min(20, Number(req.query.steps) || 6)
+  );
+
+  const send = (event, payload) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  const agentRoot = path.dirname(
+    fileURLToPath(import.meta.url)
+  );
+
+  // The public HTTPS URL is used rather than http://127.0.0.1:3000 on
+  // purpose: the session cookie is marked Secure, so Express will not
+  // issue it over plain HTTP and every login would fail at the MFA step.
+  const target =
+    process.env.PUBLIC_ORIGIN ||
+    "https://shekin.tail97139a.ts.net";
+
+  send("start", { steps, target });
+
+  const child = spawn(
+    process.execPath,
+    [path.join(agentRoot, "tools", "ai-agent.mjs")],
+    {
+      cwd: agentRoot,
+      env: {
+        ...process.env,
+        AI_BASE: target,
+        AI_MAX_STEPS: String(steps),
+        AI_DEADLINE_MS: "900000"
+      }
+    }
+  );
+
+  let pending = "";
+
+  const emit = chunk => {
+    pending += chunk.toString();
+
+    const parts = pending.split(/\r?\n/);
+    pending = parts.pop() ?? "";
+
+    for (const line of parts) {
+      if (line.trim()) {
+        send("log", { line });
+      }
+    }
+  };
+
+  child.stdout.on("data", emit);
+  child.stderr.on("data", emit);
+
+  child.on("error", error => {
+    send("done", { ok: false, error: error.message });
+    res.end();
+  });
+
+  child.on("close", code => {
+    if (pending.trim()) {
+      send("log", { line: pending });
+    }
+
+    send("done", { ok: code === 0, code });
+    res.end();
+  });
+
+  // If the browser goes away, stop the child rather than leaving it running.
+  req.on("close", () => {
+    if (child.exitCode === null && !child.killed) {
+      child.kill("SIGTERM");
+    }
+  });
+});
+
+// Lets the AI Defender panel show the report the agent just wrote. The file
+// lives inside the container, so this is the only way to reach it from the
+// browser without mounting a host directory.
+app.get("/api/ai-agent/report", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in first" });
+  }
+
+  const reportPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "tools",
+    "out",
+    "AI-AGENT-REPORT.md"
+  );
+
+  if (!existsSync(reportPath)) {
+    return res.status(404).json({
+      error: "No report yet - run the agent first"
+    });
+  }
+
+  res.type("text/markdown").send(readFileSync(reportPath, "utf8"));
+});
 
 // ==================================================
 // 27. SERVE SMARTPHONE FRONTEND

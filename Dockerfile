@@ -1,9 +1,9 @@
 # ==================================================
 # AI SMARTPHONE SECURITY SIMULATOR (web app)
 # ==================================================
-# Runs the Node/Express app that also proxies to the Strix scanner.
-# Built for a single-host deployment where both containers share a
-# private network, so no tunnel or public scanner URL is needed.
+# Runs the Node/Express app plus the AI pentest agent in tools/.
+# The agent is spawned by the AI Defender panel inside this same
+# container, so there is no separate scanner service to reach.
 # ==================================================
 
 # ---- dependencies ----
@@ -47,10 +47,15 @@ COPY --from=deps /app/node_modules ./node_modules
 # Application code. Secrets are NOT copied; they arrive as env vars.
 COPY package.json package-lock.json ./
 COPY server.js ./
-COPY strix-proxy-routes.js ./
 COPY school-routes.js ./
 COPY school-services-routes.js ./
 COPY public ./public
+
+# The pentest tooling. Copied with node ownership because the agent writes
+# its report here and the process runs as the unprivileged node user.
+COPY --chown=node:node tools ./tools
+
+RUN mkdir -p ./tools/out && chown -R node:node ./tools
 
 # Never run as root
 USER node

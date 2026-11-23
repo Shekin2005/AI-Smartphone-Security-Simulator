@@ -18,7 +18,7 @@ decides, not about which one knew more.
 | Script | `tools/pentest-suite.mjs` | `tools/ai-agent.mjs` |
 | Who chooses the request | A fixed list written in advance | An LLM, turn by turn |
 | Model involved | None | `moonshotai/kimi-k3.1-pro` |
-| Requests issued | 12 checks, many requests each | 21 |
+| Requests issued | 12 checks, many requests each | 7 |
 | Target | https://shekin.tail97139a.ts.net | https://shekin.tail97139a.ts.net |
 
 ## 2. Ground truth
@@ -68,7 +68,7 @@ How each was established:
 | Real vulnerabilities missed | 0 | 2 |
 | Controls correctly left alone | 4 | 1 |
 | Controls wrongly called vulnerable | 0 | 0 |
-| Findings it claimed | 3 | 0 self-reported + 1 confirmed from traffic |
+| Findings it claimed | 3 | 2 self-reported + 1 confirmed from traffic |
 
 ## 5. Where they differed, and why
 
@@ -76,7 +76,7 @@ Both engines agreed on the most important item and neither produced a false
 positive. The difference is coverage.
 
 **Agreement - the IDOR.** The AI chose to request the tuition endpoint itself and
-received HTTP 200 for 2 student records (AC00000063, AC00000050). Those records belong to acadia student accounts, not to the bank user.
+received HTTP 200 for 2 student records (AC00000034, AC00000035). Those records belong to acadia student accounts, not to the bank user.
 The manual engine reached the same endpoint by walking the identifier range.
 Both are correct; the AI reached it sooner because it followed the hint in its
 prompt instead of enumerating the whole range.
@@ -128,4 +128,4 @@ npm run ai                    # AI engine      -> AI-AGENT-FINDINGS.json
 node tools/compare-engines.mjs # this comparison
 ```
 
-Generated 2026-11-23T22:13:14.866Z.
+Generated 2026-11-23T23:25:35.166Z.

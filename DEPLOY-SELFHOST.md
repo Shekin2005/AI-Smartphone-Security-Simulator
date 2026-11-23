@@ -1,15 +1,15 @@
 # Run everything on one host (no Render)
 
-Render cannot run Strix. It is a container platform: you give it a container and
-it runs it, but it never hands your container a Docker daemon. Strix launches one
-sandbox container per scan, and in 1.7.0 Docker is its **only** backend:
+> **Status:** the Strix scanner service has been removed. The stack is now two
+> containers - `caddy` and `app` - and the AI pentest agent runs inside `app`
+> (see `tools/README-PENTEST.md`). Everything here about building the image,
+> secrets, Caddy and the tunnel still applies. Ignore the `scanner` container,
+> the Docker socket mount, the `STRIX_*` variables and the `strix-scanner`
+> health checks: those no longer exist.
 
-```
-strix/runtime/backends.py → _BACKENDS = {"docker": _docker_backend}
-```
-
-So Render was only ever hosting the website. This document replaces Render
-entirely: one machine runs the website, the scanner, and HTTPS.
+This document replaces Render entirely: one machine runs the website, the
+pentest tooling and HTTPS. The stack is two containers and needs no Docker
+socket, so it fits on any small host - including a free tier.
 
 ---
 
@@ -21,11 +21,11 @@ entirely: one machine runs the website, the scanner, and HTTPS.
 | Scanning always up | only when PC on | yes |
 | Tunnel needed | yes, changes every restart | **no** |
 | Re-paste URLs on restart | yes | **no** |
-| Scanner exposed to internet | yes | **no**, private network only |
-| Moving parts | 3 hosts + tunnel | 1 host, 3 containers |
+| Extra service exposed | yes | **no**, only the site is published |
+| Moving parts | 2 hosts + tunnel | 1 host, 2 containers |
 
-The app reaches Strix at `http://scanner:8000` over a private Docker network.
-That removes the tunnel, the temporary URL, and the token-in-browser surface.
+Only Caddy publishes a port. The app is reachable only through it, on a private
+Docker network, so there is no second URL to secure.
 
 ---
 
@@ -35,15 +35,11 @@ That removes the tunnel, the temporary URL, and the token-in-browser surface.
                  internet
                     │  443 (Caddy, automatic TLS)
               ┌─────▼──────┐
-              │   caddy    │
+              │   caddy    │  publishes 80; terminates TLS at the edge
               └─────┬──────┘
                     │ web network
               ┌─────▼──────┐
-              │    app     │  Node/Express + /strix-api proxy
-              └─────┬──────┘
-                    │ internal network (not internet-routable)
-              ┌─────▼──────┐
-              │  scanner   │  Strix; mounts the host Docker socket
+              │    app     │  Node/Express + AI pentest agent (tools/)
               └────────────┘
 ```
 
@@ -62,8 +58,8 @@ Any machine with a public IP and Docker works. Pick by budget.
 | **GitHub Codespaces** | 120 core-hrs/mo | **no** | no, sleeps | Free and card-free. Good for demos. |
 | **Your own PC** | $0 | no | only when on | Use the tunnel guide instead. |
 
-12 GB is comfortable; 4 GB is the practical minimum (the scanner plus one
-sandbox). The sandbox image is multi-arch, so ARM is fine and fast.
+2 GB is comfortable and 1 GB is the practical minimum. There is no scanner
+sandbox any more, so the image size is all that matters.
 
 ---
 
@@ -100,7 +96,6 @@ Fill in:
 | `TOTP_ENCRYPTION_KEY` | the SAME value that encrypted your existing secrets |
 | `PUBLIC_ORIGIN` | `https://lab.yourdomain.com` |
 | `SITE_ADDRESS` | `lab.yourdomain.com` |
-| `STRIX_SCAN_TOKEN` | `openssl rand -hex 24` |
 
 If you change `TOTP_ENCRYPTION_KEY`, every existing account breaks its MFA.
 
@@ -115,7 +110,7 @@ not issue a certificate until this resolves.
 docker compose --env-file .env.stack up -d --build
 ```
 
-First build is a few minutes (it compiles `argon2` and installs Strix).
+First build is a few minutes (it compiles the `argon2` native module).
 
 ### 6. Verify
 
@@ -124,7 +119,7 @@ docker compose --env-file .env.stack ps
 curl -fsS https://lab.yourdomain.com/api/health
 ```
 
-Expect three healthy containers and `{"status":"running"}`.
+Expect two healthy containers and `{"status":"running"}`.
 
 ### 7. Provision scan accounts (live database)
 
@@ -141,12 +136,12 @@ docker compose --env-file .env.stack run --rm --no-deps app \
   node create-scan-account.js --app bank --username scan-bank --password "ScanLab!2026pass"
 ```
 
-### 8. First scan
+### 8. First AI run
 
-Open `https://lab.yourdomain.com`, unlock with `1234`, go to **AI Defender**,
-enter your LLM key in section 01 and the account in section 02, then START SCAN.
-
-The first run downloads Strix's sandbox image (~4 GB) once.
+Open `https://lab.yourdomain.com`, sign in as a lab user, scroll to **AI Defender**
+and press **Run AI Agent**. The panel streams the agent's output live and links to
+the generated report. No key or extra setup is needed: the image ships with a free
+tier LLM key.
 
 ---
 
@@ -171,11 +166,9 @@ This exact stack was built and run on Windows Docker:
 | Container start | `sim-app` healthy, connects to PostgreSQL, listens on 0.0.0.0:3000 |
 | `GET /api/health` via Caddy | `200 {"status":"running"}` |
 | `GET /` via Caddy HTTPS | `200` |
-| `GET /defender-console.js` | `200` |
-| `GET /strix-api/health` no session | `401` |
-| app → `http://scanner:8000` | `200`, `strix 1.7.0`, `docker: true` |
-| scanner from internet | not routable; loopback only |
-| Containers | `sim-caddy`, `sim-app (healthy)`, `strix-scanner (healthy)` |
+| `GET /api/ai-agent/report` no session | `401` |
+| `GET /api/ai-agent/report` signed in | `200 text/markdown` |
+| Containers | `sim-caddy`, `sim-app (healthy)` |
 
 ---
 
@@ -185,10 +178,8 @@ This exact stack was built and run on Windows Docker:
 | --- | --- |
 | Caddy serves a certificate error | DNS not pointing at the host yet, or 80/443 blocked |
 | `403 Invalid request origin` | `PUBLIC_ORIGIN` does not exactly match the browser URL |
-| `502 Scan service unreachable` | scanner container down: `docker logs strix-scanner` |
-| `401 Invalid or missing scan token` | `.env.stack` token changed but the app was not recreated (`up -d --force-recreate`) |
 | App exits at start | `DATABASE_URL` wrong; inside containers `localhost` is the container |
-| Scans fail instantly | no LLM key in section 01 |
+| Agent run fails instantly | free LLM endpoint unreachable or rate limited |
 | Port 3000 reachable from outside | expected to fail; the app publishes no ports |
 
 ---
@@ -202,4 +193,5 @@ docker compose --env-file .env.stack up -d --build     # after git pull
 docker compose --env-file .env.stack down               # keeps volumes
 ```
 
-Reports persist in the `strix-runs` volume; certificates in `caddy-data`.
+AI reports are written to `tools/out/` inside the app container and served at
+`/api/ai-agent/report`; certificates live in the `caddy-data` volume.

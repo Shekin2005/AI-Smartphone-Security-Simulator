@@ -13,6 +13,7 @@
 <script src="./school-upgrade.js" defer></script>
 <script src="./school-services.js" defer></script>
 <script src="./colleague-rework.js" defer></script>
+<script src="./ai-agent-panel.js" defer></script>
 <link rel="stylesheet" href="./school-upgrade.css">
 <link rel="stylesheet" href="./colleague-rework.css">
   
@@ -987,6 +988,54 @@
         Attack history remains available when
         protection is OFF.
     </p>
+
+    <!-- ==========================================
+         AI PENTEST AGENT
+         Runs the same agent as `npm run ai` from the
+         command line, streamed live into this panel.
+         ========================================== -->
+    <div class="defender-panel" id="ai-agent-panel">
+
+        <div class="defender-switch-row">
+            <div>
+                <strong>AI Pentest Agent</strong>
+                <p>
+                    An LLM chooses the requests itself.
+                    It signs in with the lab accounts and
+                    tests both applications.
+                </p>
+            </div>
+
+            <button type="button"
+                    id="ai-agent-run"
+                    class="defender-refresh">
+                ▶ Run AI Agent
+            </button>
+        </div>
+
+        <p class="note" id="ai-agent-status">
+            Idle. Sign in first, then run.
+        </p>
+
+        <pre id="ai-agent-log"
+             aria-live="polite"
+             style="max-height:320px;overflow:auto;
+                    white-space:pre-wrap;text-align:left;
+                    font-size:12px;line-height:1.55;
+                    margin:0;padding:12px;
+                    border-radius:10px;
+                    background:rgba(0,0,0,0.35);"></pre>
+
+        <p class="note">
+            <a id="ai-agent-report"
+               href="/api/ai-agent/report"
+               target="_blank"
+               rel="noopener">
+                View the generated report
+            </a>
+        </p>
+
+    </div>
 
 </section>
 
