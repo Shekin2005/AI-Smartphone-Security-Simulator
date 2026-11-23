@@ -79,6 +79,12 @@ services:
       # Optional default model/key; the console normally supplies them.
       STRIX_LLM: ${STRIX_LLM:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      # Free models answer slowly: a reasoning model can take 40s+ to reply to
+      # the first turn while it digests the ~51k-token pentest prompt. Strix's
+      # 30s preflight default then aborts the scan before it starts. These
+      # defaults only apply when nothing more specific is set below.
+      LLM_PREFLIGHT_TIMEOUT: ${LLM_PREFLIGHT_TIMEOUT:-180}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-600}
 
     volumes:
       # Strix launches one sandbox container per scan, so it needs the
