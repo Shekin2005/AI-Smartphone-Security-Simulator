@@ -44,6 +44,29 @@ ORIGINAL = (
     'f"{scheme}://{caido_endpoint.host}:{caido_endpoint.port}"\n'
 )
 
+# Caido enforces a Host allowlist for DNS-rebinding protection. A request whose
+# Host header is a hostname it does not know is rejected with 403, which makes
+# client.ready() fail even though Caido is running fine.
+#
+# Measured inside the sandbox against the real sandbox image:
+#   Host: 127.0.0.1:48080        -> 200
+#   Host: host.docker.internal   -> 403
+#   GET /health via IP literal   -> 200
+#   GET /health via hostname     -> 403
+#
+# Strix never forwards STRIX_CAIDO_ALLOWED_DOMAINS into the sandbox manifest,
+# so the entrypoint's --ui-domain flag is never set. Adding it to the manifest
+# environment makes caido-cli accept the hostname the scanner dials.
+ENV_ORIGINAL = '                "NO_PROXY": "localhost,127.0.0.1",\n'
+
+ENV_PATCHED = '''                "NO_PROXY": "localhost,127.0.0.1",
+                # Allow the hostname the scanner uses to reach this port,
+                # otherwise Caido answers 403 and the SDK never connects.
+                "STRIX_CAIDO_ALLOWED_DOMAINS": os.environ.get(
+                    "STRIX_CAIDO_ALLOWED_DOMAINS", "host.docker.internal"
+                ),
+'''
+
 PATCHED = '''    # --- patched for docker-outside-of-docker -------------------------
     # The sandbox publishes its Caido port on the Docker host, so a
     # loopback host points at this container instead of the sandbox.
@@ -75,14 +98,26 @@ def main() -> int:
 
     if ORIGINAL not in source:
         print(
-            "[PATCH] expected line not found - Strix version may differ. "
+            "[PATCH] host-routing line not found - Strix version may differ. "
             "Leaving the file untouched.",
             file=sys.stderr,
         )
         return 1
 
-    TARGET.write_text(source.replace(ORIGINAL, PATCHED, 1), encoding="utf-8")
+    if ENV_ORIGINAL not in source:
+        print(
+            "[PATCH] manifest env line not found - Strix version may differ. "
+            "Leaving the file untouched.",
+            file=sys.stderr,
+        )
+        return 1
+
+    patched = source.replace(ORIGINAL, PATCHED, 1)
+    patched = patched.replace(ENV_ORIGINAL, ENV_PATCHED, 1)
+
+    TARGET.write_text(patched, encoding="utf-8")
     print("[PATCH] Caido host routing patched")
+    print("[PATCH] Caido Host allowlist patched (host.docker.internal)")
     return 0
 
 
