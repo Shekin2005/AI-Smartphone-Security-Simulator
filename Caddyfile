@@ -18,6 +18,12 @@
 	@stream path /strix-api/*/stream
 	reverse_proxy @stream app:3000 {
 		flush_interval -1
+		# cloudflared speaks plain HTTP to Caddy, but the public edge is
+		# HTTPS. Without this the app sees req.secure=false and silently
+		# refuses to send the Secure session cookie, so login appears to
+		# succeed and then every later request is unauthenticated.
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
 	}
 
 	# Everything else
@@ -27,6 +33,11 @@
 			read_timeout 30m
 			write_timeout 30m
 		}
+
+		# Same reason as the stream block: keep the public scheme HTTPS so
+		# Secure cookies are actually issued.
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
 	}
 
 	# Sensible headers. The app already sets a strict CSP via helmet;
