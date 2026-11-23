@@ -33,6 +33,8 @@
     groq: "https://api.groq.com/openai/v1",
     // Native Gemini routing needs no base URL; the scanner clears it anyway.
     google: "",
+    zai: "https://api.z.ai/api/paas/v4",
+    nvidia: "https://integrate.api.nvidia.com/v1",
     ollama: "http://host.docker.internal:11434",
     custom: ""
   };
@@ -46,6 +48,11 @@
     // ("I cannot perform security scans"), which wastes a whole scan.
     // Flash-Lite complies and emits tool calls, so it is the default.
     google: "gemini-3.5-flash-lite",
+    // Z.ai's Flash models are listed as $0 in and out, 128k context, tools.
+    zai: "glm-4.5-flash",
+    // Same model OpenRouter serves free, on NVIDIA's separate quota. Its 1M
+    // context clears Strix's ~51k prompt with room to spare.
+    nvidia: "nvidia/nemotron-3-ultra-550b-a55b",
     ollama: "qwen3:4b"
   };
 

@@ -985,7 +985,15 @@ async def create_scan(request: Request):
         "xai": "xai",
         "ollama": "ollama",
         "google": "gemini",
+        "zai": "openai",
+        "nvidia": "openai",
     }.get(provider)
+
+    # Any OpenAI-compatible host has to go through LiteLLM's openai/ route,
+    # because that is the route that honours LLM_API_BASE. Without a prefix,
+    # an id such as "meta/llama-3.3-70b" is read as provider "meta" and fails.
+    if provider == "custom":
+        provider_prefix = "openai"
 
     # OpenRouter publishes ids like "nvidia/nemotron-3-ultra-550b-a55b:free",
     # which already contain a slash. Checking for "/" alone would leave those
@@ -1062,6 +1070,16 @@ async def create_scan(request: Request):
                     )
                     + " Copy the key from openrouter.ai/keys and paste it into "
                     "the API KEY field; keep the model name in the MODEL field."
+                ),
+            )
+
+        if provider == "nvidia" and not api_key.startswith("nvapi-"):
+            raise HTTPException(
+                400,
+                (
+                    "NVIDIA NIM keys start with 'nvapi-'. The value received "
+                    f"starts with '{api_key[:6]}'. Create a key at "
+                    "build.nvidia.com and paste it into the API KEY field."
                 ),
             )
 
@@ -1528,6 +1546,17 @@ PROVIDERS: dict[str, dict[str, str]] = {
     "ollama": {
         # Chat uses Ollama's OpenAI-compatible shim, which lives under /v1.
         "base": "http://host.docker.internal:11434/v1",
+        "style": "openai",
+    },
+    "zai": {
+        # Z.ai's GLM Flash models are permanently $0 and need no card.
+        "base": "https://api.z.ai/api/paas/v4",
+        "style": "openai",
+    },
+    "nvidia": {
+        # NVIDIA NIM hosts the same Nemotron models OpenRouter serves free, on
+        # a separate quota and with a much higher request rate.
+        "base": "https://integrate.api.nvidia.com/v1",
         "style": "openai",
     },
     "custom": {
