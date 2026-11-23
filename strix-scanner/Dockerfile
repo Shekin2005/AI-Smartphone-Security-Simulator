@@ -43,6 +43,12 @@ RUN pip install --upgrade pip \
 
 COPY main.py .
 
+# Strix publishes the sandbox's Caido proxy on the Docker host, then dials
+# 127.0.0.1 - which points at this container, not the sandbox. Rewrite that
+# to host.docker.internal so proxy tools work under docker-outside-of-docker.
+COPY patch_caido_host.py .
+RUN python patch_caido_host.py
+
 RUN mkdir -p /data/runs /data/uploads
 
 EXPOSE 8000
