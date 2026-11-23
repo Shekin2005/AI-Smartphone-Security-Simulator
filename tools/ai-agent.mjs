@@ -719,7 +719,11 @@ async function main() {
   writeFileSync(reportPath, lines.join("\n"));
   writeFileSync(
     jsonPath,
-    JSON.stringify({ target: BASE, model: LLM_MODEL, summary, findings, trace }, null, 2)
+    JSON.stringify(
+      { target: BASE, model: LLM_MODEL, summary, findings, detected, trace },
+      null,
+      2
+    )
   );
 
   const executed = trace.filter((t) => t.tool === "http_request").length;

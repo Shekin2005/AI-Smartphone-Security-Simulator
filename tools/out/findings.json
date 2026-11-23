@@ -1,6 +1,6 @@
 {
   "target": "https://shekin.tail97139a.ts.net",
-  "generated_at": "2026-11-23T18:08:34.509Z",
+  "generated_at": "2026-11-23T21:57:45.718Z",
   "results": [
     {
       "id": "headers",
@@ -204,7 +204,7 @@
           "response": "HTTP 429 {\"error\":\"Too many attempts. Sign in again later.\"}"
         },
         {
-          "request": "POST /api/auth/login at +11s, new session",
+          "request": "POST /api/auth/login at +10s, new session",
           "response": "HTTP 429 (still locked)"
         },
         {
