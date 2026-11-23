@@ -1,0 +1,326 @@
+{
+  "target": "https://shekin.tail97139a.ts.net",
+  "generated_at": "2026-11-23T18:08:34.509Z",
+  "results": [
+    {
+      "id": "headers",
+      "title": "HTTP security headers",
+      "severity": "Info",
+      "category": "Hardening",
+      "cwe": null,
+      "vulnerable": false,
+      "summary": "All 5 expected security headers are present.",
+      "evidence": [
+        {
+          "request": "GET https://shekin.tail97139a.ts.net/",
+          "response": "HTTP 200 | present: Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options, Referrer-Policy"
+        }
+      ],
+      "remediation": "No action needed - helmet is already applying these headers. Keep them enabled."
+    },
+    {
+      "id": "cookie-flags",
+      "title": "Session cookie flags",
+      "severity": "Info",
+      "category": "Session management",
+      "cwe": null,
+      "vulnerable": false,
+      "summary": "Session cookie is HttpOnly, Secure and SameSite=Strict.",
+      "evidence": [
+        {
+          "request": "POST https://shekin.tail97139a.ts.net/api/auth/login (bank)",
+          "response": "HTTP 200 | Set-Cookie flags: HttpOnly=true Secure=true SameSite=Strict=true"
+        }
+      ],
+      "remediation": "No action needed. Note that Secure means plain http:// will not keep a session - always use https://."
+    },
+    {
+      "id": "unauth-access",
+      "title": "Protected endpoints reject anonymous callers",
+      "severity": "High",
+      "category": "Broken access control",
+      "cwe": null,
+      "vulnerable": false,
+      "summary": "All 7 protected endpoints returned 401 without a session.",
+      "evidence": [
+        {
+          "request": "GET /api/bank/accounts (no cookie)",
+          "response": "HTTP 401 {\"error\":\"Authentication required\"}"
+        },
+        {
+          "request": "GET /api/bank/tuition/student/AC00000001 (no cookie)",
+          "response": "HTTP 401 {\"error\":\"Authentication required\"}"
+        },
+        {
+          "request": "GET /api/school/enrollments (no cookie)",
+          "response": "HTTP 401 {\"error\":\"Authentication required\"}"
+        },
+        {
+          "request": "GET /api/school/services/summary (no cookie)",
+          "response": "HTTP 401 {\"error\":\"Authentication required\"}"
+        },
+        {
+          "request": "GET /api/school/admin/students (no cookie)",
+          "response": "HTTP 401 {\"error\":\"Authentication required\"}"
+        },
+        {
+          "request": "GET /api/security/events (no cookie)",
+          "response": "HTTP 401 {\"error\":\"Sign in first\"}"
+        },
+        {
+          "request": "GET /api/bank/payments (no cookie)",
+          "response": "HTTP 401 {\"error\":\"Authentication required\"}"
+        }
+      ],
+      "remediation": "No action needed - every tested endpoint requires a verified MFA session."
+    },
+    {
+      "id": "cross-app",
+      "title": "A bank session cannot read the school app (and vice versa)",
+      "severity": "High",
+      "category": "Broken access control",
+      "cwe": null,
+      "vulnerable": false,
+      "summary": "Each session only reaches its own application. Cross-app reads are rejected with 401.",
+      "evidence": [
+        {
+          "request": "GET /api/bank/accounts with BANK session (positive control)",
+          "response": "HTTP 200 {\"accounts\":[{\"user_id\":\"62\",\"kind\":\"chequing\",\"balance_cents\":\"150000\"},{\"user_id\":\"62\",\"..."
+        },
+        {
+          "request": "GET /api/school/enrollments with BANK session (attack)",
+          "response": "HTTP 401 {\"error\":\"Authentication required\"}"
+        },
+        {
+          "request": "GET /api/school/enrollments with SCHOOL session (positive control)",
+          "response": "HTTP 200 {\"enrollments\":[{\"id\":\"16\",\"code\":\"BUSI 1703\",\"title\":\"Introduction to Business\",\"term\":\"F..."
+        },
+        {
+          "request": "GET /api/bank/accounts with SCHOOL session (attack)",
+          "response": "HTTP 401 {\"error\":\"Authentication required\"}"
+        }
+      ],
+      "remediation": "No action needed - requireApp()/requireAcadiaRole() correctly pin the session to one application."
+    },
+    {
+      "id": "vertical-escalation",
+      "title": "A student cannot reach administrator functions",
+      "severity": "Critical",
+      "category": "Privilege escalation",
+      "cwe": null,
+      "vulnerable": false,
+      "summary": "All 6 administrator endpoints rejected the student session (401/403).",
+      "evidence": [
+        {
+          "request": "GET /api/school/enrollments with STUDENT session (positive control)",
+          "response": "HTTP 200 {\"enrollments\":[{\"id\":\"16\",\"code\":\"BUSI 1703\",\"title\":\"Introduction to Business\",\"term\":\"F..."
+        },
+        {
+          "request": "GET /api/school/admin/students with STUDENT session",
+          "response": "HTTP 403 {\"error\":\"Access denied for this account role\"}"
+        },
+        {
+          "request": "GET /api/school/admin/requests with STUDENT session",
+          "response": "HTTP 403 {\"error\":\"Access denied for this account role\"}"
+        },
+        {
+          "request": "GET /api/school/services/admin/finance-history/1 with STUDENT session",
+          "response": "HTTP 403 {\"error\":\"Access denied for this account role\"}"
+        },
+        {
+          "request": "GET /api/school/admin/course-manager/students with STUDENT session",
+          "response": "HTTP 403 {\"error\":\"Access denied for this account role\"}"
+        },
+        {
+          "request": "POST /api/school/admin/grades with STUDENT session",
+          "response": "HTTP 403 {\"error\":\"Access denied for this account role\"}"
+        },
+        {
+          "request": "POST /api/school/services/admin/finance-adjust with STUDENT session",
+          "response": "HTTP 403 {\"error\":\"Access denied for this account role\"}"
+        }
+      ],
+      "remediation": "No action needed - requireAcadiaRole('admin') is enforced on every administrator route."
+    },
+    {
+      "id": "bola-tuition",
+      "title": "Any bank user can read every student's name and tuition balance",
+      "severity": "Medium",
+      "category": "Broken object level authorization (BOLA/IDOR)",
+      "cwe": "CWE-639",
+      "vulnerable": true,
+      "summary": "6 student record(s) - names and outstanding tuition - were disclosed to a bank account with no relationship to them.",
+      "evidence": [
+        {
+          "request": "GET /api/bank/tuition/student/AC00000001..AC00000090 (bank session, 4 at a time)",
+          "response": "6 student record(s) disclosed"
+        },
+        {
+          "request": "GET /api/bank/tuition/student/AC00000034",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000034\",\"name\":\"0306446\",\"tuitionCents\":200000}}"
+        },
+        {
+          "request": "GET /api/bank/tuition/student/AC00000035",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000035\",\"name\":\"shekin\",\"tuitionCents\":125000}}"
+        },
+        {
+          "request": "GET /api/bank/tuition/student/AC00000036",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000036\",\"name\":\"jass\",\"tuitionCents\":125000}}"
+        },
+        {
+          "request": "GET /api/bank/tuition/student/AC00000048",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000048\",\"name\":\"0207602\",\"tuitionCents\":405000}}"
+        },
+        {
+          "request": "GET /api/bank/tuition/student/AC00000050",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000050\",\"name\":\"0306776\",\"tuitionCents\":125000}}"
+        },
+        {
+          "request": "GET /api/bank/tuition/student/AC00000063",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000063\",\"name\":\"Scan Student\",\"tuitionCents\":4925000}}"
+        }
+      ],
+      "remediation": "The lookup must be scoped to students the caller has a legitimate relationship with. Instead of a bare sequential ID, require a payer/student link (for example a row in a payments or tuition-link table for req.session.userId) and return 404 when no link exists. Replace the sequential AC######## identifier with an unguessable reference, and rate-limit enumeration."
+    },
+    {
+      "id": "mfa-brute-force",
+      "title": "MFA guessing is only weakly rate-limited",
+      "severity": "Medium",
+      "category": "Authentication / brute force",
+      "cwe": "CWE-307",
+      "vulnerable": true,
+      "summary": "Three wrong codes triggered a lock (HTTP 429), but it released after about 31s and the counter is not persistent. At that rate about 2.5% of the 1,000,000-code space can be covered per day.",
+      "evidence": [
+        {
+          "request": "POST /api/auth/verify with wrong code (attempt 1)",
+          "response": "HTTP 401 {\"error\":\"Invalid, expired, or already used code\"}"
+        },
+        {
+          "request": "POST /api/auth/verify with wrong code (attempt 2)",
+          "response": "HTTP 401 {\"error\":\"Invalid, expired, or already used code\"}"
+        },
+        {
+          "request": "POST /api/auth/verify with wrong code (attempt 3)",
+          "response": "HTTP 429 {\"error\":\"Too many attempts. Sign in again later.\"}"
+        },
+        {
+          "request": "POST /api/auth/login at +11s, new session",
+          "response": "HTTP 429 (still locked)"
+        },
+        {
+          "request": "POST /api/auth/login at +20s, new session",
+          "response": "HTTP 429 (still locked)"
+        },
+        {
+          "request": "POST /api/auth/login at +31s, new session",
+          "response": "HTTP 200 - lock released"
+        }
+      ],
+      "remediation": "Track MFA failures in the database against the user (not the session), apply exponential backoff that persists across sessions, lock after a small number of failures until an administrator or out-of-band step clears it, and alert on repeated MFA failures. Consider accepting only the current time step rather than a +/-1 window."
+    },
+    {
+      "id": "user-enumeration",
+      "title": "Login does not reveal whether an account exists",
+      "severity": "Low",
+      "category": "Information disclosure",
+      "cwe": "CWE-204",
+      "vulnerable": false,
+      "summary": "Existing and non-existing usernames both returned HTTP 401 with an identical body.",
+      "evidence": [
+        {
+          "request": "POST /api/auth/login (real user, wrong password)",
+          "response": "HTTP 401 {\"error\":\"Invalid credentials\"}"
+        },
+        {
+          "request": "POST /api/auth/login (unknown user, wrong password)",
+          "response": "HTTP 401 {\"error\":\"Invalid credentials\"}"
+        }
+      ],
+      "remediation": "Keep the identical generic message. Also consider equalising response time, because argon2 verification runs only when the user exists."
+    },
+    {
+      "id": "session-fixation",
+      "title": "Session identifier rotates on authentication",
+      "severity": "Medium",
+      "category": "Session management",
+      "cwe": "CWE-384",
+      "vulnerable": false,
+      "summary": "A client-chosen identifier was rejected, and the session id was reissued when the session became authenticated.",
+      "evidence": [
+        {
+          "request": "POST /api/auth/login with Cookie: sim.sid=s%3Afixated000000000000000000000000.forgedsignature",
+          "response": "HTTP 200 | chosen id adopted: false"
+        },
+        {
+          "request": "POST /api/auth/verify (compare sid before/after)",
+          "response": "HTTP 200 | sid reissued after authentication: true"
+        }
+      ],
+      "remediation": "No action needed - identifiers are HMAC-signed so a chosen id is rejected, and session.regenerate() is called at login."
+    },
+    {
+      "id": "register-role",
+      "title": "Public registration cannot create an administrator",
+      "severity": "Critical",
+      "category": "Privilege escalation",
+      "cwe": "CWE-269",
+      "vulnerable": false,
+      "summary": "Registration accepted a role:\"admin\" field but the account was still just a student: /api/school/enrollments returned 200 while /api/school/admin/students returned 403.",
+      "evidence": [
+        {
+          "request": "POST /api/auth/register {app:'acadia', role:'admin', isAdmin:true, roles:['admin']}",
+          "response": "HTTP 201 {\"message\":\"Account created. Please sign in.\"}"
+        },
+        {
+          "request": "POST /api/auth/enroll (new account)",
+          "response": "HTTP 200 enrolment secret issued"
+        },
+        {
+          "request": "POST /api/auth/verify with that secret",
+          "response": "HTTP 200"
+        },
+        {
+          "request": "GET /api/school/enrollments (positive control)",
+          "response": "HTTP 200"
+        },
+        {
+          "request": "GET /api/school/admin/students (escalation attempt)",
+          "response": "HTTP 403 {\"error\":\"Access denied for this account role\"}"
+        }
+      ],
+      "remediation": "No action needed - the handler destructures only app/username/password and assigns the role server-side. Delete the probe account after testing."
+    },
+    {
+      "id": "auth-ratelimit",
+      "title": "Authentication endpoints are rate limited",
+      "severity": "Medium",
+      "category": "Authentication",
+      "cwe": "CWE-770",
+      "vulnerable": false,
+      "summary": "A limiter is active (policy: 30;w=900).",
+      "evidence": [
+        {
+          "request": "POST /api/auth/login (single probe request)",
+          "response": "HTTP 401 | RateLimit-Policy: 30;w=900 | RateLimit-Limit: (none)"
+        }
+      ],
+      "remediation": "No action needed at this level. Note the limiter is per IP address and in-memory, so it resets on restart and does not follow an account across IPs."
+    },
+    {
+      "id": "https-enforcement",
+      "title": "Plain HTTP is not redirected to HTTPS",
+      "severity": "Low",
+      "category": "Transport security",
+      "cwe": "CWE-319",
+      "vulnerable": true,
+      "summary": "Plain HTTP returned HTTP 200 with no redirect. Because the session cookie is Secure, a browser on http:// silently loses its session after login.",
+      "evidence": [
+        {
+          "request": "GET http://shekin.tail97139a.ts.net/",
+          "response": "HTTP 200 | Location: (none)"
+        }
+      ],
+      "remediation": "Add an HTTP listener that answers with a 308 redirect to the HTTPS host, or enforce HTTPS at the edge (Tailscale Funnel already terminates TLS, so redirect inside Caddy). Users should always be given the https:// URL."
+    }
+  ]
+}

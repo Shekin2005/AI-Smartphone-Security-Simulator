@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "check:js": "node --check server.js && node --check public/app.js"
+    "check:js": "node --check server.js && node --check public/app.js",
+    "pentest": "node tools/pentest-suite.mjs"
   },
   "engines": {
     "node": ">=20"
