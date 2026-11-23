@@ -122,6 +122,15 @@ app.use(session({
 // 5. SAME-ORIGIN API PROTECTION
 // ==================================================
 
+// The simulator is reached from several addresses: the published tunnel
+// URL, the tailnet IP and localhost. Pinning the check to PUBLIC_ORIGIN
+// alone made every login succeed in the browser's eyes but fail with a
+// 403 whenever the page was opened from any address other than that one
+// exact string, because only GETs skip this guard. Accept the published
+// host *and* the host the browser actually addressed. A cross-site
+// attacker's Origin never matches the Host the victim requested, so the
+// CSRF guarantee is unchanged; only the scheme is not compared, which is
+// what lets the same host work over both http and https.
 app.use("/api", (req, res, next) => {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     return next();
@@ -129,17 +138,38 @@ app.use("/api", (req, res, next) => {
 
   const origin = req.get("origin");
 
-  try {
-    const requestOrigin =
-  process.env.PUBLIC_ORIGIN ||
-  `${req.protocol}://${req.get("host")}`;
+  const allowedHosts = new Set();
 
-    if (!origin || new URL(origin).origin !== requestOrigin) {
-      return res.status(403).json({
-        error: "Invalid request origin"
-      });
+  for (const candidate of [
+    req.get("host"),
+    process.env.PUBLIC_ORIGIN
+  ]) {
+    if (!candidate) {
+      continue;
     }
+
+    try {
+      allowedHosts.add(
+        new URL(
+          candidate.includes("://")
+            ? candidate
+            : `http://${candidate}`
+        ).host
+      );
+    } catch {
+      /* ignore a malformed PUBLIC_ORIGIN */
+    }
+  }
+
+  let originHost = null;
+
+  try {
+    originHost = origin ? new URL(origin).host : null;
   } catch {
+    originHost = null;
+  }
+
+  if (!originHost || !allowedHosts.has(originHost)) {
     return res.status(403).json({
       error: "Invalid request origin"
     });
