@@ -1,0 +1,19 @@
+# Keep secrets and local state out of the build context.
+.env
+.env.*
+!.env.example
+
+node_modules
+.git
+.gitignore
+
+# backups, dumps and logs never belong in an image
+backups
+*.bak-*
+*.log
+*.dump
+
+# the scanner builds from its own directory
+strix-scanner
+
+*.md

@@ -1,0 +1,44 @@
+# ==================================================
+# CADDY - automatic HTTPS in front of the simulator
+# ==================================================
+# SITE_ADDRESS is injected by docker-compose from .env.stack.
+#
+#   local network:  lab.local            (Caddy uses its own CA)
+#   public domain:  lab.example.com      (Let's Encrypt, needs ports 80+443)
+#
+# Compose's SITE_ADDRESS is used directly as the site label.
+# ==================================================
+
+{$SITE_ADDRESS:lab.local} {
+
+	encode zstd gzip
+
+	# Server-Sent Events must not be buffered, or the live agent log
+	# arrives in one lump at the end of the scan instead of streaming.
+	@stream path /strix-api/*/stream
+	reverse_proxy @stream app:3000 {
+		flush_interval -1
+	}
+
+	# Everything else
+	reverse_proxy app:3000 {
+		# Long scans: Strix can take many minutes on a deep run.
+		transport http {
+			read_timeout 30m
+			write_timeout 30m
+		}
+	}
+
+	# Sensible headers. The app already sets a strict CSP via helmet;
+	# these are only the proxy-side extras.
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

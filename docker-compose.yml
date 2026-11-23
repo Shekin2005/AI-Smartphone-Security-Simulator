@@ -1,0 +1,137 @@
+# ==================================================
+# FULL STACK - ONE HOST
+# ==================================================
+# Replaces Render completely. Runs three containers on a private
+# network:
+#
+#   caddy    -> public HTTPS, automatic certificates
+#   app      -> the simulator (Node/Express) + /strix-api proxy
+#   scanner  -> Strix itself, with Docker socket access for sandboxes
+#
+# Because app and scanner share a network, the app reaches Strix at
+# http://scanner:8000 directly. No tunnel, no public scanner URL, and
+# the scanner is never exposed to the internet.
+#
+# Usage:
+#   cp .env.stack.example .env.stack   # then fill it in
+#   docker compose --env-file .env.stack up -d --build
+#
+# `--env-file` replaces Compose's automatic .env so your local
+# development .env is left untouched.
+# ==================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-smartphone-app:1.0.0
+    container_name: sim-app
+    restart: unless-stopped
+
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOST: 0.0.0.0
+
+      # Required
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env.stack}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?set TOTP_ENCRYPTION_KEY}
+
+      # Exact public origin for the same-origin API guard.
+      # Must match the URL the browser uses, or every POST returns 403.
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN e.g. https://lab.example.com}
+
+      # Internal service name - not a public URL
+      STRIX_SCANNER_URL: http://scanner:8000
+      STRIX_SCAN_TOKEN: ${STRIX_SCAN_TOKEN:?set STRIX_SCAN_TOKEN}
+
+      # Optional lab flags
+      LAB_VULNERABLE_MODE: ${LAB_VULNERABLE_MODE:-true}
+      LAB_RECOVERY_DATABASE_URL: ${LAB_RECOVERY_DATABASE_URL:-}
+
+    depends_on:
+      scanner:
+        condition: service_healthy
+
+    networks:
+      - web
+      - internal
+
+    # No published port: only Caddy can reach the app.
+
+  scanner:
+    build:
+      context: ./strix-scanner
+      dockerfile: Dockerfile
+    image: ai-smartphone-strix-scanner:1.0.0
+    container_name: strix-scanner
+    restart: unless-stopped
+
+    environment:
+      # Strix attacks the PUBLIC url, because the app compares Origin
+      # against PUBLIC_ORIGIN. Loopback would be rejected with 403.
+      TARGET_BASE: ${PUBLIC_ORIGIN}
+      RUNS_DIR: /data/runs
+      UPLOAD_DIR: /data/uploads
+      STRIX_SCAN_TOKEN: ${STRIX_SCAN_TOKEN}
+      # Optional default model/key; the console normally supplies them.
+      STRIX_LLM: ${STRIX_LLM:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+
+    volumes:
+      # Strix launches one sandbox container per scan, so it needs the
+      # host daemon. Without this it cannot run at all.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - strix-runs:/data/runs
+      - strix-uploads:/data/uploads
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    networks:
+      - internal
+      - web
+
+    # Loopback only, for debugging. Remove if you never SSH-tunnel in.
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: sim-caddy
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    environment:
+      # Caddy asks Let's Encrypt for this exact hostname.
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS e.g. lab.example.com}
+
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+    depends_on:
+      - app
+
+    networks:
+      - web
+
+networks:
+  # public-facing side, reached by Caddy
+  web:
+
+  # private side: app <-> scanner only
+  internal:
+    internal: true
+
+volumes:
+  strix-runs:
+  strix-uploads:
+  caddy-data:
+  caddy-config:
