@@ -38,9 +38,10 @@ const ORIGIN = BASE;
 // Free, no card required. This endpoint needs no credits.
 const LLM_BASE = process.env.AI_LLM_BASE || "https://integrate.api.nvidia.com/v1";
 const LLM_MODEL = process.env.AI_MODEL || "moonshotai/kimi-k3.1-pro";
-const LLM_KEY =
-  process.env.AI_LLM_KEY ||
-  "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";
+
+// Supply your own free key: https://build.nvidia.com -> Get API Key.
+// Never commit a real key - this file is published with the project.
+const LLM_KEY = process.env.AI_LLM_KEY || "";
 
 const MAX_STEPS = Number(process.env.AI_MAX_STEPS || 16);
 const DEADLINE_MS = Number(process.env.AI_DEADLINE_MS || 600000);
@@ -356,6 +357,16 @@ async function main() {
   console.log(`Model  : ${LLM_MODEL} (free endpoint)`);
   console.log(`Steps  : max ${MAX_STEPS}`);
   console.log("");
+
+  if (!LLM_KEY) {
+    console.error("[!] No LLM key set.");
+    console.error("    Get a free NVIDIA key at https://build.nvidia.com (no card), then:");
+    console.error("      AI_LLM_KEY=nvapi-... node tools/ai-agent.mjs");
+    console.error("");
+    console.error("    The deterministic suite needs no key: npm run pentest");
+    process.exitCode = 1;
+    return;
+  }
 
   mkdirSync(OUT_DIR, { recursive: true });
 
