@@ -39,9 +39,13 @@ const ORIGIN = BASE;
 const LLM_BASE = process.env.AI_LLM_BASE || "https://integrate.api.nvidia.com/v1";
 const LLM_MODEL = process.env.AI_MODEL || "moonshotai/kimi-k3.1-pro";
 
-// Supply your own free key: https://build.nvidia.com -> Get API Key.
-// Never commit a real key - this file is published with the project.
-const LLM_KEY = process.env.AI_LLM_KEY || "";
+// The lab owner supplied this free NVIDIA key so the agent runs with no setup.
+// NVIDIA NIM's free tier needs no card. Override it any time with AI_LLM_KEY.
+// If you fork this project, get your own key at https://build.nvidia.com
+// and treat the one below as public.
+const LLM_KEY =
+  process.env.AI_LLM_KEY ||
+  "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";
 
 const MAX_STEPS = Number(process.env.AI_MAX_STEPS || 16);
 const DEADLINE_MS = Number(process.env.AI_DEADLINE_MS || 600000);

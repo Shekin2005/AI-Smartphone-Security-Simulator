@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "check:js": "node --check server.js && node --check public/app.js",
-    "pentest": "node tools/pentest-suite.mjs"
+    "pentest": "node tools/pentest-suite.mjs",
+    "ai": "node tools/ai-agent.mjs",
+    "pentest:all": "node tools/pentest-suite.mjs && node tools/ai-agent.mjs"
   },
   "engines": {
     "node": ">=20"
