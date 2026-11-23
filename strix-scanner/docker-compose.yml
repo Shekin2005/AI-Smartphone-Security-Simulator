@@ -18,8 +18,11 @@ services:
       - "127.0.0.1:8000:8000"
 
     environment:
-      # Where the agent should attack. The simulator listens on the host.
-      TARGET_BASE: http://host.docker.internal:3000
+      # Where the agent should attack.
+      #   - scanner on the same machine as the app: host.docker.internal:3000
+      #   - scanner on a separate VM (Oracle):  your public site URL
+      # Override with TARGET_BASE=... in the .env next to this file.
+      TARGET_BASE: ${TARGET_BASE:-http://host.docker.internal:3000}
       RUNS_DIR: /data/runs
       UPLOAD_DIR: /data/uploads
       # Optional defaults; the console normally supplies these per scan.
