@@ -104,8 +104,11 @@ services:
     restart: unless-stopped
 
     ports:
+      # Only 80. The 443 mapping was removed because Caddy serves HTTP on 80
+      # (SITE_ADDRESS=:80) and the public edge terminates TLS itself - first
+      # cloudflared, now Tailscale Funnel. Docker holding 443 stopped
+      # tailscaled from binding it for the funnel listener.
       - "80:80"
-      - "443:443"
 
     environment:
       # Caddy asks Let's Encrypt for this exact hostname.
