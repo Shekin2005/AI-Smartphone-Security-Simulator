@@ -41,9 +41,11 @@
   // model the provider offers can still be typed in.
   const DEFAULT_MODEL = {
     openrouter: "nvidia/nemotron-3-ultra-550b-a55b:free",
-    // gemini-2.5-flash is deprecated and closed to new keys, so the free
-    // default is the current Flash model. 3.5-flash-lite also works.
-    google: "gemini-3.8-flash",
+    // Verified live against this project's key. gemini-3.8-flash does not
+    // exist. gemini-3.5-flash works but refuses security work outright
+    // ("I cannot perform security scans"), which wastes a whole scan.
+    // Flash-Lite complies and emits tool calls, so it is the default.
+    google: "gemini-3.5-flash-lite",
     ollama: "qwen3:4b"
   };
 
@@ -216,28 +218,27 @@
     // A placeholder is never submitted, so an untouched model field would
     // post an empty string and the scan would be rejected. Fill the field
     // itself, but never overwrite a model the user typed in.
-    const suggestions = new Set(Object.values(DEFAULT_MODEL));
-
-    function suggestModel() {
-      const current = model.value.trim();
-
-      if (current && !suggestions.has(current)) return;
-
+    function suggestModel(force) {
       const next = DEFAULT_MODEL[provider.value];
-      if (next) {
-        model.value = next;
-        saveMemory({ model: next });
-      }
+
+      // On load, only fill an empty field. On an explicit provider change,
+      // always take that provider's default: a model left over from another
+      // provider (or a mistyped one) is the fastest way to a failed scan.
+      if (!next) return;
+      if (!force && model.value.trim()) return;
+
+      model.value = next;
+      saveMemory({ model: next });
     }
 
     base.placeholder = DEFAULT_BASE[provider.value] || "";
     model.placeholder = DEFAULT_MODEL[provider.value] || "gpt-4o-mini";
-    suggestModel();
+    suggestModel(false);
 
     provider.addEventListener("change", () => {
       base.placeholder = DEFAULT_BASE[provider.value] || "";
       model.placeholder = DEFAULT_MODEL[provider.value] || "gpt-4o-mini";
-      suggestModel();
+      suggestModel(true);
       saveMemory({ provider: provider.value });
     });
 

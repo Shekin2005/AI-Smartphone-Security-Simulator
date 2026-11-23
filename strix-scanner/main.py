@@ -538,6 +538,78 @@ def announce(scan: Scan, message: str) -> None:
     maybe_save_scan(scan)
 
 
+# A finished scan with zero findings only means "clean" if the agent
+# actually attacked the target. A model that refused, or that only wrote a
+# threat model and called finish_scan, produces the same empty report - so
+# the difference has to be stated rather than implied.
+REFUSAL_MARKERS = (
+    "cannot fulfill this request",
+    "i cannot perform security",
+    "i cannot make http requests",
+    "i cannot interact with specific endpoints",
+    "i cannot assist with",
+    "i'm unable to assist",
+    "i am unable to assist",
+)
+
+# Tools that plan or record work without ever touching the target.
+PLANNING_TOOLS = {
+    "think",
+    "save_threat_model",
+    "get_threat_model",
+    "create_todo",
+    "update_todo",
+    "list_reports",
+    "finish_scan",
+    "output_store",
+    "notes",
+    "coverage",
+    "web_search",
+    "load_skill",
+    "wait_for_user",
+}
+
+
+def detect_untested(scan: Scan) -> str | None:
+    """Explain why a zero-finding result may not mean the target is clean."""
+    logs = sorted(Path(scan.workspace).glob("strix_runs/*/strix.log"))
+    if not logs:
+        return None
+
+    try:
+        text = logs[-1].read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return None
+
+    lowered = text.lower()
+
+    for marker in REFUSAL_MARKERS:
+        if marker in lowered:
+            return (
+                "the model refused part of this task, so zero findings is not "
+                "a clean bill of health. Use a model that permits authorized "
+                "security testing, then run the scan again."
+            )
+
+    used = set(re.findall(r"invoking tool ([a-z_]+)", lowered))
+
+    if not used:
+        return (
+            "the agent never invoked a tool, so nothing was tested. Treat zero "
+            "findings as untested rather than clean."
+        )
+
+    if used <= PLANNING_TOOLS:
+        return (
+            "the agent only used planning tools ("
+            + ", ".join(sorted(used))
+            + ") and never touched the target. Treat zero findings as "
+            "untested rather than clean."
+        )
+
+    return None
+
+
 def finalize(scan: Scan, exit_code: int) -> None:
     scan.exit_code = exit_code
     scan.finished_at = datetime.now(timezone.utc).isoformat()
@@ -569,6 +641,11 @@ def finalize(scan: Scan, exit_code: int) -> None:
                 f"across {sum(scan.counts.values())} severity entries.",
             )
         else:
+            untested = detect_untested(scan)
+
+            if untested:
+                announce(scan, "WARNING: " + untested)
+
             announce(scan, "Scan complete: no findings reported.")
     elif exit_code == 0:
         scan.status = "completed"
@@ -914,9 +991,19 @@ async def create_scan(request: Request):
     # which already contain a slash. Checking for "/" alone would leave those
     # unprefixed, so Strix would read "nvidia" as the provider and fail. Prefix
     # unless the provider prefix is already there.
+    # Strip any prefix the user already typed, then add exactly one back. Doing
+    # it this way is idempotent: "gemini-3.5-flash" and "gemini/gemini-3.5-flash"
+    # both end up as "gemini/gemini-3.5-flash". Checking for a "not startswith"
+    # on its own is wrong because "gemini/gemini-x" legitimately starts with the
+    # prefix while still being malformed.
     model_for_strix = model
-    if model and provider_prefix and not model.startswith(f"{provider_prefix}/"):
-        model_for_strix = f"{provider_prefix}/{model}"
+    if model_for_strix and provider_prefix:
+        prefix = f"{provider_prefix}/"
+        while model_for_strix.startswith(prefix):
+            model_for_strix = model_for_strix[len(prefix):]
+
+        if model_for_strix:
+            model_for_strix = f"{prefix}{model_for_strix}"
 
     is_ollama = model_for_strix.startswith("ollama/")
 
@@ -978,14 +1065,16 @@ async def create_scan(request: Request):
                 ),
             )
 
-        # Google AI Studio keys are recognisable. Checking the shape catches a
-        # swapped or truncated paste before a sandbox is created.
-        if provider == "google" and not api_key.startswith("AIza"):
+        # Google issues two key formats: the older "AIza..." and the newer
+        # "AQ...." string. Both are valid, so accept either.
+        if provider == "google" and not (
+            api_key.startswith("AIza") or api_key.startswith("AQ.")
+        ):
             looks_like_model = "/" in api_key or ":" in api_key
             raise HTTPException(
                 400,
                 (
-                    "Google AI Studio keys start with 'AIza'. The value "
+                    "Google keys start with 'AIza' or 'AQ.'. The value "
                     f"received starts with '{api_key[:4]}'"
                     + (
                         " and looks like a model name, so the MODEL and API "
@@ -1016,7 +1105,7 @@ async def create_scan(request: Request):
     # The gemini/ prefix routes through LiteLLM's native Google provider. That
     # provider builds its own URL, so passing the OpenAI-compatible base URL
     # alongside it would send the call to the wrong path.
-    if provider == "google" and model_for_strix.startswith("gemini/"):
+    if model_for_strix.startswith("gemini/"):
         llm_base_url = ""
 
     if is_ollama and llm_base_url:
@@ -1040,12 +1129,18 @@ async def create_scan(request: Request):
             # The variable LiteLLM's ollama_chat provider actually reads.
             env["OLLAMA_API_BASE"] = llm_base_url
 
-    if provider == "google" and api_key:
+    if model_for_strix.startswith("gemini/") and api_key:
         # LiteLLM's native Gemini provider reads GEMINI_API_KEY. Strix also
         # mirrors LLM_API_KEY into provider variables, but setting both here
-        # means the scan works regardless of that mirroring.
+        # means the scan works regardless of that mirroring, and even when the
+        # provider dropdown was left on "Custom".
         env["GEMINI_API_KEY"] = api_key
         env["GOOGLE_API_KEY"] = api_key
+
+        # A hosted Flash model still needs more than Strix's 30s default when a
+        # ~51k-token prompt is being processed on the first turn.
+        env.setdefault("LLM_PREFLIGHT_TIMEOUT", "300")
+        env.setdefault("LLM_TIMEOUT", "600")
 
     if is_ollama:
         # Strix's preflight gives the model 30s to answer. CPU inference on a
@@ -1099,17 +1194,25 @@ async def create_scan(request: Request):
     else:
         expected = {
             "openrouter": "sk-or-v1-",
-            "google": "AIza",
         }.get(provider)
-        shape = (
-            "format: matches"
-            if expected and api_key.startswith(expected)
-            else (
-                f"format: does not start with '{expected}'"
-                if expected
-                else "format: not checked for this provider"
+
+        if provider == "google" or model_for_strix.startswith("gemini/"):
+            expected = "AIza or AQ."
+            shape = (
+                "format: matches"
+                if api_key.startswith(("AIza", "AQ."))
+                else "format: does not start with 'AIza' or 'AQ.'"
             )
-        )
+        else:
+            shape = (
+                "format: matches"
+                if expected and api_key.startswith(expected)
+                else (
+                    f"format: does not start with '{expected}'"
+                    if expected
+                    else "format: not checked for this provider"
+                )
+            )
         announce(
             scan,
             f"API key: received len={len(api_key)}"
