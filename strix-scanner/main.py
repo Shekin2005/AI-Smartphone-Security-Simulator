@@ -1120,6 +1120,29 @@ async def create_scan(request: Request):
             "xai": "https://api.x.ai/v1",
         }.get(provider, "")
 
+    # Fall back to the provider table so a newly added provider cannot be
+    # forgotten here. Without this, a provider missing from the map above
+    # silently produced no LLM_API_BASE, and LiteLLM sent the key to
+    # api.openai.com instead of the intended host. Only OpenAI-style entries
+    # are used: the anthropic entry needs its own client, not a base URL.
+    if not llm_base_url:
+        fallback = PROVIDERS.get(provider) or {}
+        if fallback.get("style") == "openai":
+            llm_base_url = fallback.get("base") or ""
+
+    # A keyless OpenAI-style provider with no endpoint always means the key is
+    # about to be sent to the wrong host. Fail loudly instead of returning a
+    # confusing 401 from OpenAI.
+    if provider_prefix == "openai" and not is_ollama and not llm_base_url:
+        raise HTTPException(
+            400,
+            (
+                f"No endpoint is configured for provider '{provider}'. "
+                "Pick a provider from the list, or choose Custom and enter "
+                "its Base URL."
+            ),
+        )
+
     # The gemini/ prefix routes through LiteLLM's native Google provider. That
     # provider builds its own URL, so passing the OpenAI-compatible base URL
     # alongside it would send the call to the wrong path.
