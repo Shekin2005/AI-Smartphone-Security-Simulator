@@ -783,8 +783,16 @@
   }
 
   function enableDownloads(artifacts) {
+    const finished = Object.keys(artifacts || {}).length > 0;
+
     document.querySelectorAll("#defender .sx-downloads button").forEach(button => {
-      button.disabled = !artifacts[button.dataset.kind];
+      const kind = button.dataset.kind;
+
+      // The PDF is rendered on demand from the report, so it never appears in
+      // the artifact list. Disabling it made a working download look broken.
+      const ready = kind === "pdf" ? finished : Boolean(artifacts[kind]);
+
+      button.disabled = !ready;
     });
   }
 
