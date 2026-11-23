@@ -31,8 +31,20 @@
     anthropic: "https://api.anthropic.com",
     openrouter: "https://openrouter.ai/api/v1",
     groq: "https://api.groq.com/openai/v1",
-    google: "https://generativelanguage.googleapis.com/v1beta/openai",
+    // Native Gemini routing needs no base URL; the scanner clears it anyway.
+    google: "",
+    ollama: "http://host.docker.internal:11434",
     custom: ""
+  };
+
+  // A suggested starting model per provider. The field stays free text, so any
+  // model the provider offers can still be typed in.
+  const DEFAULT_MODEL = {
+    openrouter: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    // gemini-2.5-flash is deprecated and closed to new keys, so the free
+    // default is the current Flash model. 3.5-flash-lite also works.
+    google: "gemini-3.8-flash",
+    ollama: "qwen3:4b"
   };
 
   const state = {
@@ -42,7 +54,8 @@
     chatHistory: [],
     timer: null,
     startedAt: 0,
-    finished: false
+    finished: false,
+    streamErrors: 0
   };
 
   const $ = id => document.getElementById(id);
@@ -196,10 +209,35 @@
     if (memory.model) model.value = memory.model;
     if (memory.baseUrl) base.value = memory.baseUrl;
 
+    // A first visit should land on a provider with a real zero-cost tier
+    // rather than a paid default the user has to notice and change.
+    if (!memory.provider && !provider.value) provider.value = "openrouter";
+
+    // A placeholder is never submitted, so an untouched model field would
+    // post an empty string and the scan would be rejected. Fill the field
+    // itself, but never overwrite a model the user typed in.
+    const suggestions = new Set(Object.values(DEFAULT_MODEL));
+
+    function suggestModel() {
+      const current = model.value.trim();
+
+      if (current && !suggestions.has(current)) return;
+
+      const next = DEFAULT_MODEL[provider.value];
+      if (next) {
+        model.value = next;
+        saveMemory({ model: next });
+      }
+    }
+
     base.placeholder = DEFAULT_BASE[provider.value] || "";
+    model.placeholder = DEFAULT_MODEL[provider.value] || "gpt-4o-mini";
+    suggestModel();
 
     provider.addEventListener("change", () => {
       base.placeholder = DEFAULT_BASE[provider.value] || "";
+      model.placeholder = DEFAULT_MODEL[provider.value] || "gpt-4o-mini";
+      suggestModel();
       saveMemory({ provider: provider.value });
     });
 
@@ -498,8 +536,22 @@
     const target = TARGETS[state.target];
     const settings = modelSettings();
 
-    if (!settings.llm_api_key) {
-      showError("Add an API key in section 01, then start the scan.");
+    // A local Ollama ignores the key entirely, so do not demand one for it.
+    const keyRequired = settings.provider !== "ollama";
+
+    if (keyRequired && !settings.llm_api_key) {
+      showError(
+        "No API key. Paste it into the API KEY field in section 01 — it is " +
+          "cleared whenever the page reloads."
+      );
+
+      // Take the user to the field instead of leaving them to find it.
+      const keyField = $("sx-key");
+      if (keyField) {
+        keyField.scrollIntoView({ behavior: "smooth", block: "center" });
+        keyField.focus({ preventScroll: true });
+      }
+
       return;
     }
 
@@ -616,8 +668,10 @@
     });
 
     state.streaming = source;
+    state.streamErrors = 0;
 
     source.onmessage = event => {
+      state.streamErrors = 0;
       try {
         appendLog(JSON.parse(event.data));
       } catch {
@@ -632,11 +686,22 @@
     });
 
     source.onerror = () => {
-      if (source.readyState === EventSource.CLOSED) return;
+      // CLOSED means the browser has given up for good (the scan is gone, or
+      // the stream was rejected). CONNECTING means it will retry by itself,
+      // so let it - a live scan must not be abandoned on a brief blip.
+      if (source.readyState === EventSource.CLOSED) {
+        if (state.streaming === source) state.streaming = null;
+        void finishScan(scanId);
+        return;
+      }
 
-      source.close();
-      state.streaming = null;
-      void finishScan(scanId);
+      state.streamErrors = (state.streamErrors || 0) + 1;
+
+      if (state.streamErrors >= 6) {
+        source.close();
+        if (state.streaming === source) state.streaming = null;
+        void finishScan(scanId);
+      }
     };
   }
 
@@ -688,7 +753,23 @@
 
       await loadReport(scanId);
     } catch (error) {
-      showError(error.message);
+      // Never leave the console sitting on RUNNING: if the scan cannot be
+      // read back, say so and reset the controls.
+      if (error.status === 404) {
+        setStatus("scan lost");
+        showError(
+          "The scanner restarted and no longer has this scan. Start a new scan."
+        );
+      } else {
+        setStatus("error");
+        showError(error.message);
+      }
+
+      const took = $("sx-took");
+      if (took) took.textContent = "no report - scan ended early";
+
+      renderCounts({});
+      enableDownloads({});
     }
   }
 

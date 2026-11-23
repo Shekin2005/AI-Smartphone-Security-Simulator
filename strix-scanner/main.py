@@ -174,14 +174,115 @@ def persist_history() -> None:
         print(f"[HISTORY] could not persist: {exc}", flush=True)
 
 
+def save_scan(scan: Scan) -> None:
+    """Write one scan's full state into its workspace.
+
+    The workspace lives on the strix-runs volume, so this is what makes a
+    scan survive a container rebuild. Without it a rebuilt scanner answers
+    404 and the console shows "Scan not found".
+    """
+    try:
+        workspace = Path(scan.workspace)
+        workspace.mkdir(parents=True, exist_ok=True)
+        body = {
+            **scan.to_public(),
+            "instruction": scan.instruction,
+            "log": scan.log[-2000:],
+        }
+        target = workspace / "scan.json"
+        tmp = workspace / "scan.json.tmp"
+        tmp.write_text(json.dumps(body), encoding="utf-8")
+        tmp.replace(target)
+    except Exception as exc:  # pragma: no cover - best effort only
+        print(f"[PERSIST] {scan.id}: {exc}", flush=True)
+
+
+_LAST_SAVE: dict[str, float] = {}
+_SAVE_INTERVAL = 10.0
+
+
+def maybe_save_scan(scan: Scan) -> None:
+    """Persist at most once every few seconds.
+
+    Saving only at the end was not enough: a scan interrupted by a container
+    restart left no file on disk, so it disappeared from the console instead
+    of showing up as interrupted. Writing periodically means every scan that
+    ever started can be reported on after a crash.
+    """
+    now = time.monotonic()
+    if now - _LAST_SAVE.get(scan.id, 0.0) < _SAVE_INTERVAL:
+        return
+
+    _LAST_SAVE[scan.id] = now
+    save_scan(scan)
+
+
+def load_scans() -> None:
+    """Reload past scans from the volume after a restart."""
+    restored = 0
+    for meta in sorted(RUNS_DIR.glob("*/scan.json")):
+        try:
+            data = json.loads(meta.read_text(encoding="utf-8"))
+            scan_id = data["id"]
+            if scan_id in SCANS:
+                continue
+
+            # A scan that was mid-flight when the container died can never
+            # finish. Mark it failed and say why, rather than pretending it
+            # is still running forever.
+            interrupted = data.get("status") in ("queued", "running")
+            scan = Scan(
+                id=scan_id,
+                target=data.get("target", ""),
+                target_kind=data.get("target_kind", ""),
+                mode=data.get("mode", ""),
+                model=data.get("model", ""),
+                instruction=data.get("instruction", ""),
+                created_at=data.get("created_at") or "",
+                status="failed" if interrupted else data.get("status", "failed"),
+                exit_code=data.get("exit_code"),
+                started_at=data.get("started_at"),
+                finished_at=data.get("finished_at"),
+                duration_seconds=data.get("duration_seconds"),
+                error=(
+                    "Interrupted: the scanner restarted while this scan was "
+                    "running. Start a new scan."
+                    if interrupted
+                    else data.get("error")
+                ),
+                workspace=str(meta.parent),
+                log=list(data.get("log") or []),
+                findings=list(data.get("findings") or []),
+                counts=dict(data.get("counts") or {}),
+                artifacts=dict(data.get("artifacts") or {}),
+                finished=True,
+            )
+            if interrupted and scan.error:
+                scan.log.append(scan.error)
+
+            SCANS[scan_id] = scan
+            restored += 1
+        except Exception as exc:  # pragma: no cover
+            print(f"[RESTORE] {meta}: {exc}", flush=True)
+
+    if restored:
+        print(f"[RESTORE] reloaded {restored} scan(s) from {RUNS_DIR}", flush=True)
+
+
+load_scans()
+
+
 # ----------------------------------------------------------------------
 # Secret redaction
 # ----------------------------------------------------------------------
 
 
 def redact(text: str, scan: Scan) -> str:
+    # Only mask values long enough to plausibly be a real secret. A short
+    # placeholder such as the dummy key "ollama" would otherwise redact the
+    # provider name out of every log line.
     for secret in scan.redactions:
-        if secret and len(secret) >= 4:
+        if secret and len(secret) >= 8:
             text = text.replace(secret, "***redacted***")
     # Belt and braces: mask anything that looks like an API key.
     text = re.sub(r"\bsk-[A-Za-z0-9_\-]{8,}", "sk-***redacted***", text)
@@ -434,6 +535,8 @@ def announce(scan: Scan, message: str) -> None:
         except queue.Empty:
             pass
 
+    maybe_save_scan(scan)
+
 
 def finalize(scan: Scan, exit_code: int) -> None:
     scan.exit_code = exit_code
@@ -484,6 +587,7 @@ def finalize(scan: Scan, exit_code: int) -> None:
             pass
 
     persist_history()
+    save_scan(scan)
 
 
 def run_scan(scan: Scan, argv: list[str], env: dict[str, str]) -> None:
@@ -603,13 +707,69 @@ def pdf_available() -> bool:
 # ----------------------------------------------------------------------
 
 
+# Strix's system prompt plus its 44 tool definitions measured 50,860
+# tokens in practice. A smaller window means Ollama drops the middle of the
+# prompt and the agent runs with no instructions at all.
+STRIX_PROMPT_TOKENS = 51000
+
+# The prompt alone is not enough: the model still has to think and emit a
+# tool call inside the same window. Reserve roughly 8k tokens for that, so
+# a 51200-token server is still rejected as too tight.
+STRIX_MIN_CONTEXT = STRIX_PROMPT_TOKENS + 8000
+
+# Expensive readiness probes are cached so /api/health stays a liveness
+# check. `docker info` alone can outlast the healthcheck timeout when the
+# daemon is busy, which made the container flap to unhealthy mid-scan.
+_PROBE_CACHE: dict[str, tuple[float, Any]] = {}
+_PROBE_TTL = 60.0
+
+
+def cached_probe(name: str, probe: Any) -> Any:
+    now = time.monotonic()
+    hit = _PROBE_CACHE.get(name)
+    if hit is not None and now - hit[0] < _PROBE_TTL:
+        return hit[1]
+
+    value = probe()
+    _PROBE_CACHE[name] = (now, value)
+    return value
+
+
+def ollama_effective_context(base_url: str, model: str) -> int | None:
+    """Return Ollama's context length for a resident model, else None.
+
+    /api/ps only reports models that are currently loaded, so this is best
+    effort: an unloaded model's window cannot be read without loading it,
+    which costs minutes on CPU. When the value is unknown we let the scan
+    try rather than blocking it on a guess.
+    """
+    if not base_url:
+        return None
+
+    name = model.split("/", 1)[1] if "/" in model else model
+
+    try:
+        response = httpx.get(base_url.rstrip("/") + "/api/ps", timeout=8)
+        if response.status_code != 200:
+            return None
+
+        for entry in response.json().get("models") or []:
+            if name in (entry.get("name"), entry.get("model")):
+                value = entry.get("context_length")
+                return int(value) if value else None
+    except Exception:
+        return None
+
+    return None
+
+
 @app.get("/api/health", dependencies=[Depends(require_token)])
 def health():
     return {
         "status": "ok",
-        "strix": strix_available(),
-        "docker": docker_available(),
-        "pdf_available": pdf_available(),
+        "strix": cached_probe("strix", strix_available),
+        "docker": cached_probe("docker", docker_available),
+        "pdf_available": cached_probe("pdf", pdf_available),
         "target_base": TARGET_BASE,
         "active": sum(1 for s in SCANS.values() if s.status == "running"),
     }
@@ -727,11 +887,234 @@ async def create_scan(request: Request):
     if max_turns not in (None, "", 0, "0"):
         argv += ["--max-turns", str(max_turns)]
 
+    # ---- model routing -------------------------------------------------
+    # Two separate traps live here:
+    #
+    # 1. A bare model name means "OpenAI" to Strix unless LLM_API_BASE is
+    #    set, so "qwen3:4b" is rejected outright. Known providers therefore
+    #    get their prefix added: provider=ollama -> ollama/qwen3:4b.
+    #
+    # 2. LiteLLM's ollama_chat provider appends "/api/chat" to the base
+    #    URL. Ollama's native API has no /v1 prefix, so a base ending in
+    #    /v1 produces <base>/v1/api/chat and Ollama answers 404. Strip it.
+    provider = str(payload.get("provider") or "").lower()
+    llm_base_url = str(payload.get("base_url") or "").strip()
+
+    provider_prefix = {
+        "openrouter": "openrouter",
+        "deepseek": "deepseek",
+        "groq": "groq",
+        "mistral": "mistral",
+        "xai": "xai",
+        "ollama": "ollama",
+        "google": "gemini",
+    }.get(provider)
+
+    # OpenRouter publishes ids like "nvidia/nemotron-3-ultra-550b-a55b:free",
+    # which already contain a slash. Checking for "/" alone would leave those
+    # unprefixed, so Strix would read "nvidia" as the provider and fail. Prefix
+    # unless the provider prefix is already there.
+    model_for_strix = model
+    if model and provider_prefix and not model.startswith(f"{provider_prefix}/"):
+        model_for_strix = f"{provider_prefix}/{model}"
+
+    is_ollama = model_for_strix.startswith("ollama/")
+
+    # ---- key validation -------------------------------------------------
+    # A provider 401 tells the user nothing: "Missing Authentication header"
+    # and "User not found" look alike but mean different things. Check the
+    # key here so a missing, mangled or truncated key fails with something
+    # the user can act on, before a sandbox is even created.
+    if not is_ollama:
+        if not api_key:
+            raise HTTPException(
+                400,
+                (
+                    "No API key reached the scanner. Paste the key into "
+                    "section 01 of the console (the field clears itself when "
+                    "the page reloads) and start the scan again."
+                ),
+            )
+
+        if any(ch.isspace() for ch in api_key) or not api_key.isascii():
+            raise HTTPException(
+                400,
+                (
+                    "The API key contains spaces, line breaks or non-ASCII "
+                    "characters, so the provider will reject it. Re-copy the "
+                    "key from the provider dashboard and paste it again."
+                ),
+            )
+
+        if len(api_key) < 20:
+            raise HTTPException(
+                400,
+                (
+                    f"The API key is only {len(api_key)} characters long, "
+                    "which is too short to be a real key. It looks truncated "
+                    "- re-copy the whole key."
+                ),
+            )
+
+        # The most common mix-up by far: the model name pasted into the API
+        # KEY field. OpenRouter answers that with "Missing Authentication
+        # header", which reads like a key problem but gives no hint what to
+        # fix. Catch it here instead.
+        if provider == "openrouter" and not api_key.startswith("sk-or-"):
+            looks_like_model = "/" in api_key or ":" in api_key
+            raise HTTPException(
+                400,
+                (
+                    "OpenRouter API keys start with 'sk-or-v1-'. The value "
+                    f"received starts with '{api_key[:4]}'"
+                    + (
+                        " and looks like a model name, so the MODEL and API "
+                        "KEY fields may be swapped."
+                        if looks_like_model
+                        else ", which is not an OpenRouter key."
+                    )
+                    + " Copy the key from openrouter.ai/keys and paste it into "
+                    "the API KEY field; keep the model name in the MODEL field."
+                ),
+            )
+
+        # Google AI Studio keys are recognisable. Checking the shape catches a
+        # swapped or truncated paste before a sandbox is created.
+        if provider == "google" and not api_key.startswith("AIza"):
+            looks_like_model = "/" in api_key or ":" in api_key
+            raise HTTPException(
+                400,
+                (
+                    "Google AI Studio keys start with 'AIza'. The value "
+                    f"received starts with '{api_key[:4]}'"
+                    + (
+                        " and looks like a model name, so the MODEL and API "
+                        "KEY fields may be swapped."
+                        if looks_like_model
+                        else ", which is not a Google API key."
+                    )
+                    + " Create one at aistudio.google.com/apikey and paste it "
+                    "into the API KEY field."
+                ),
+            )
+
+    # Sensible default endpoint for a local Ollama, so the console does not
+    # need to know the container/Docker host quirk.
+    if provider == "ollama" and not llm_base_url:
+        llm_base_url = "http://host.docker.internal:11434"
+
+    # Providers that need an explicit OpenAI-compatible endpoint.
+    if not llm_base_url:
+        llm_base_url = {
+            "openrouter": "https://openrouter.ai/api/v1",
+            "groq": "https://api.groq.com/openai/v1",
+            "deepseek": "https://api.deepseek.com/v1",
+            "mistral": "https://api.mistral.ai/v1",
+            "xai": "https://api.x.ai/v1",
+        }.get(provider, "")
+
+    # The gemini/ prefix routes through LiteLLM's native Google provider. That
+    # provider builds its own URL, so passing the OpenAI-compatible base URL
+    # alongside it would send the call to the wrong path.
+    if provider == "google" and model_for_strix.startswith("gemini/"):
+        llm_base_url = ""
+
+    if is_ollama and llm_base_url:
+        llm_base_url = llm_base_url.rstrip("/")
+        if llm_base_url.endswith("/v1"):
+            llm_base_url = llm_base_url[:-3]
+
     env = os.environ.copy()
-    if model:
-        env["STRIX_LLM"] = model
+    if model_for_strix:
+        env["STRIX_LLM"] = model_for_strix
+
     if api_key:
         env["LLM_API_KEY"] = api_key
+    elif is_ollama:
+        # Strix refuses to start without a key; Ollama ignores its value.
+        env["LLM_API_KEY"] = "ollama"
+
+    if llm_base_url:
+        env["LLM_API_BASE"] = llm_base_url
+        if is_ollama:
+            # The variable LiteLLM's ollama_chat provider actually reads.
+            env["OLLAMA_API_BASE"] = llm_base_url
+
+    if provider == "google" and api_key:
+        # LiteLLM's native Gemini provider reads GEMINI_API_KEY. Strix also
+        # mirrors LLM_API_KEY into provider variables, but setting both here
+        # means the scan works regardless of that mirroring.
+        env["GEMINI_API_KEY"] = api_key
+        env["GOOGLE_API_KEY"] = api_key
+
+    if is_ollama:
+        # Strix's preflight gives the model 30s to answer. CPU inference on a
+        # 4B model takes roughly a minute, so that default fails every time.
+        env.setdefault("LLM_PREFLIGHT_TIMEOUT", "300")
+        env.setdefault("LLM_TIMEOUT", "900")
+        env.setdefault("LLM_STREAM_IDLE_TIMEOUT", "900")
+
+        # Refuse to launch a scan that cannot work. With a small window
+        # Ollama keeps only the tail of the prompt, so Strix never sees its
+        # own rules or the test credentials and spins until cancelled.
+        effective = ollama_effective_context(llm_base_url, model_for_strix)
+
+        if effective is not None and effective < STRIX_MIN_CONTEXT:
+            raise HTTPException(
+                400,
+                (
+                    f"Ollama is running {model_for_strix} with a {effective}-token "
+                    f"context. Strix's prompt alone is about "
+                    f"{STRIX_PROMPT_TOKENS:,} tokens, so it needs roughly "
+                    f"{STRIX_MIN_CONTEXT:,} including room to answer. "
+                    "Ollama would discard most of the prompt and the agent "
+                    "would run without its instructions. Restart Ollama with "
+                    "a larger window, for example "
+                    "OLLAMA_CONTEXT_LENGTH=65536 and "
+                    "OLLAMA_KV_CACHE_TYPE=q4_0 to keep the KV cache small, "
+                    "then start the scan again."
+                ),
+            )
+
+        announce(
+            scan,
+            f"Ollama context: {effective if effective else 'unknown (model not loaded)'}"
+            f" | Strix needs about {STRIX_MIN_CONTEXT:,}",
+        )
+
+    announce(
+        scan,
+        f"Model: {model_for_strix or '(none)'}"
+        + (
+            f" | endpoint: {llm_base_url}"
+            if llm_base_url
+            else " | endpoint: provider default"
+        ),
+    )
+
+    # Describe the key's shape without ever printing it, so a rejected key can
+    # be diagnosed from the log alone.
+    if is_ollama:
+        announce(scan, "API key: not required for local Ollama")
+    else:
+        expected = {
+            "openrouter": "sk-or-v1-",
+            "google": "AIza",
+        }.get(provider)
+        shape = (
+            "format: matches"
+            if expected and api_key.startswith(expected)
+            else (
+                f"format: does not start with '{expected}'"
+                if expected
+                else "format: not checked for this provider"
+            )
+        )
+        announce(
+            scan,
+            f"API key: received len={len(api_key)}"
+            f" | provider={provider or 'custom'} | {shape}",
+        )
 
     with SCANS_LOCK:
         SCANS[scan_id] = scan
@@ -1039,6 +1422,11 @@ PROVIDERS: dict[str, dict[str, str]] = {
         "base": "https://generativelanguage.googleapis.com/v1beta/openai",
         "style": "openai",
     },
+    "ollama": {
+        # Chat uses Ollama's OpenAI-compatible shim, which lives under /v1.
+        "base": "http://host.docker.internal:11434/v1",
+        "style": "openai",
+    },
     "custom": {
         "base": "",
         "style": "openai",
@@ -1113,6 +1501,14 @@ def chat_targets(payload: dict) -> tuple[str, str, str, str]:
     api_key = str(
         payload.get("llm_api_key") or os.environ.get("LLM_API_KEY") or ""
     ).strip()
+
+    # Scans need Ollama's native root, but report chat needs its
+    # OpenAI-compatible /v1 shim. One field therefore has to serve both.
+    if provider == "ollama":
+        if base_url and not base_url.endswith("/v1"):
+            base_url = base_url + "/v1"
+        if not api_key:
+            api_key = "ollama"  # Ollama ignores the value; the SDK wants one
 
     if not base_url:
         raise HTTPException(

@@ -50,7 +50,7 @@ EXPOSE 8000
 # The health endpoint is token-protected once STRIX_SCAN_TOKEN is set, so
 # the probe must present it or the container is reported unhealthy while
 # actually working fine.
-HEALTHCHECK --interval=20s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -fsS -H "x-scan-token: ${STRIX_SCAN_TOKEN}" http://127.0.0.1:8000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=25s --start-period=60s --retries=5 \
+    CMD curl -fsS -m 20 -H "x-scan-token: ${STRIX_SCAN_TOKEN}" http://127.0.0.1:8000/api/health || exit 1
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
