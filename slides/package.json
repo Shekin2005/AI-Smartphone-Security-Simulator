@@ -1,0 +1,15 @@
+{
+  "name": "ai-smartphone-security-slides",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Builds AI-Smartphone-Security-Simulator.pptx and verifies its layout",
+  "type": "module",
+  "scripts": {
+    "build": "node build-deck.mjs",
+    "verify": "node verify-deck.mjs"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.1",
+    "pptxgenjs": "^3.12.0"
+  }
+}
