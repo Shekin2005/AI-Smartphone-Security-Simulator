@@ -153,6 +153,7 @@ def c(*keys):
 
 BOLD = re.compile(r"(\*\*.+?\*\*)")
 CODE = re.compile(r"(`[^`]+`)")
+ITALIC = re.compile(r"(\*[^*\n]+?\*)")
 
 
 def add_runs(p, text, size=None, bold=False, italic=False, color=None,
@@ -174,20 +175,30 @@ def add_runs(p, text, size=None, bold=False, italic=False, color=None,
             if not part:
                 continue
             is_code = part.startswith("`") and part.endswith("`") and len(part) > 2
-            r = p.add_run(part[1:-1] if is_code else part)
-            r.bold = bold or seg_bold
-            if is_code:
-                r.font.name = CODE_FONT
-                r.font.size = Pt((size or 11) - 1.0)
-            else:
-                if font:
-                    r.font.name = font
-                if size:
-                    r.font.size = Pt(size)
-            if italic:
-                r.italic = True
-            if color is not None:
-                r.font.color.rgb = color
+
+            # Code spans are emitted verbatim: an asterisk inside `a * b` is an
+            # operator, not emphasis. Everything else is split on *italic*.
+            pieces = [(part[1:-1], False)] if is_code else [
+                (s[1:-1], True) if s.startswith("*") and s.endswith("*") and len(s) > 2
+                else (s, False)
+                for s in ITALIC.split(part) if s
+            ]
+
+            for text_piece, is_italic in pieces:
+                r = p.add_run(text_piece)
+                r.bold = bold or seg_bold
+                if is_code:
+                    r.font.name = CODE_FONT
+                    r.font.size = Pt((size or 11) - 1.0)
+                else:
+                    if font:
+                        r.font.name = font
+                    if size:
+                        r.font.size = Pt(size)
+                if italic or is_italic:
+                    r.italic = True
+                if color is not None:
+                    r.font.color.rgb = color
     return p
 
 

@@ -6,7 +6,7 @@ All three editions describe the same assessment, from the same recorded run of
 | File | Pages | Use it for |
 | --- | --- | --- |
 | `AI-Smartphone-Security-Simulator-Full-Report.docx` | **22** | The primary submission. Adds the industry-evidence chapter (§3) — Big Sleep, MDASH, Anthropic, XBOW, DARPA AIxCC, the ARTEMIS head-to-head, Semgrep's evaluation and the Omdia survey — plus a dedicated AI-vs-manual chapter (§7) and an AI tooling/cost appendix. 15 references. |
-| `AI-Smartphone-Security-Simulator-Report-Short.docx` | 8 | Submission where a strict page limit applies. Every finding, the engine comparison, 36 references. |
+| `AI-Smartphone-Security-Simulator-Report-Short.docx` | 9 | Submission where a strict page limit applies. Every finding, the engine comparison, 38 references. |
 | `AI-Smartphone-Security-Simulator-Project-Report.docx` | 32 | The earlier reference edition (pre-industry-evidence). Superseded by the full report; kept for its standalone source-code walkthrough. |
 
 Each has a matching `.pdf` exported from the `.docx`.
@@ -46,7 +46,7 @@ layout:
 
 ```bash
 python docs/build-project-docx-full.py      # 22-page primary edition (15 refs)
-python docs/build-project-docx-short.py     # 8-page edition (36 refs)
+python docs/build-project-docx-short.py     # 9-page edition (38 refs)
 python docs/build-project-docx.py           # 32-page legacy reference edition
 python docs/verify-docx.py docs/AI-Smartphone-Security-Simulator-Full-Report.docx
 ```
@@ -56,7 +56,7 @@ table cells. It exits non-zero if any is found.
 
 The table of contents in the **full** edition is a Word field. Word resolves it
 on open, or right-click → *Update Field*. The short edition has no contents
-page, since eight pages does not need one.
+page, since nine pages does not need one.
 
 ## Changing the citation style
 
