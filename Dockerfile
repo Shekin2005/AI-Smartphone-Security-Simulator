@@ -74,14 +74,22 @@ COPY school-services-routes.js ./
 COPY public ./public
 
 # Schema plus migrations, so a fresh database can be created inside the
-# container without copying files in by hand.
-COPY schema.sql ./
+# container without copying files in by hand. The glob also covers
+# schema.sql, which must therefore exist or the build fails loudly.
 COPY *.sql ./
 
 # Bootstrap: waits for the database, applies the schema, seeds the lab
 # accounts, then starts the server.
 COPY --chown=node:node docker ./docker
-RUN chmod +x ./docker/entrypoint.sh
+
+# Strip any CRLF from the entrypoint before making it executable. A Windows
+# checkout with core.autocrlf=true would otherwise give the script a
+# "#!/bin/sh\r" shebang, which fails at start with the misleading error
+# "exec /app/docker/entrypoint.sh failed: No such file or directory".
+# .gitattributes keeps it LF too; this makes the image correct either way.
+RUN sed -i 's/\r$//' ./docker/entrypoint.sh \
+    && chmod +x ./docker/entrypoint.sh \
+    && head -1 ./docker/entrypoint.sh
 
 # The pentest tooling. Copied with node ownership because the agent writes
 # its report here and the process runs as the unprivileged node user.

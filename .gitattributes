@@ -1,0 +1,18 @@
+# Shell scripts must keep LF endings even when checked out on Windows.
+# With CRLF the shebang becomes "#!/bin/sh\r", the kernel looks for an
+# interpreter called "/bin/sh\r", and the container fails at start with
+# "exec /app/docker/entrypoint.sh failed: No such file or directory".
+*.sh text eol=lf
+docker/*.sh text eol=lf
+
+# Dockerfiles are read by the daemon, not a shell, but LF keeps them consistent.
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Everything else may use the platform default.
+*.mjs text
+*.js text
+*.json text
+*.md text
+*.sql text
