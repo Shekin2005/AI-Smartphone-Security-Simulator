@@ -1843,6 +1843,12 @@ app.get("/api/ai-agent/run", (req, res) => {
     }
   };
 
+  // Some tools (openssl s_client) read stdin. Nothing is ever typed into them
+  // here, so close it - otherwise they block until the three minute guard.
+  if (child.stdin) {
+    child.stdin.end();
+  }
+
   child.stdout.on("data", emit);
   child.stderr.on("data", emit);
 
@@ -2025,9 +2031,11 @@ const TERMINAL_BINARIES = {
   dig: "DNS lookup",
   host: "DNS lookup",
   nslookup: "DNS lookup",
-  whois: "domain registration lookup",
   openssl: "TLS inspection"
 };
+// `whois` is deliberately absent: in this image it fails with
+// "getaddrinfo(whois.verisign-grs.com): Servname not supported for ai_socktype",
+// so offering it would put a dead command in the demo.
 
 // The only machines this terminal may touch. Without this it would be a free
 // scanning proxy for any third party.
@@ -2054,8 +2062,8 @@ const TERMINAL_HELP = [
   "  nmap -sV -p 80,443 host               service versions",
   "  curl -i http://host/api/health        raw HTTP request",
   "  whatweb -a 1 http://host              fingerprint the stack",
-  "  dig host                              DNS lookup",
-  "  openssl s_client -connect host:443    TLS inspection",
+  "  dig +short host                       DNS lookup",
+  "  openssl s_client -connect host:443    TLS certificate inspection",
   "",
   "Targets must be this lab: shekin.tail97139a.ts.net, host.docker.internal,",
   "127.0.0.1, localhost. Shell features (; | & $ ` > <) are not supported -",
@@ -2143,6 +2151,27 @@ function terminalHostOf(token) {
   }
 
   return value.toLowerCase();
+}
+
+// curl writes a progress meter to stderr, which floods the transcript.
+function normalizeCurlArgs(args) {
+  const silent = args.some(
+    arg => arg === "--silent" || /^-[a-zA-Z]*s[a-zA-Z]*$/.test(arg)
+  );
+
+  return silent ? args : [...args, "-sS"];
+}
+
+// `openssl s_client` prints the handshake then waits for the server to close the
+// connection, which it does not, so the command runs until the three minute
+// guard fires. `-brief` prints the same verdict and exits at once (measured:
+// 0 s, versus the full 180 s guard without it).
+function normalizeOpensslArgs(args) {
+  if (!args.includes("s_client") || args.includes("-brief")) {
+    return args;
+  }
+
+  return [...args, "-brief"];
 }
 
 // nikto expects `-h host` plus a separate `-p port` and `-ssl`, not the URL you
@@ -2344,19 +2373,25 @@ app.get("/api/lab/terminal/exec", (req, res) => {
     ];
   } else if (Object.prototype.hasOwnProperty.call(TERMINAL_BINARIES, name)) {
     command = name;
-    commandArgs = name === "nikto" ? normalizeNiktoArgs(args) : args;
-
-    // nikto can stop to ask about its database; this keeps it unattended.
-    if (name === "nikto" && !commandArgs.includes("-nointeractive")) {
-      commandArgs = [...commandArgs, "-nointeractive"];
-    }
+    commandArgs = args;
 
     if (name === "nikto") {
+      commandArgs = normalizeNiktoArgs(args);
+
+      // nikto can stop to ask about its database; this keeps it unattended.
+      if (!commandArgs.includes("-nointeractive")) {
+        commandArgs = [...commandArgs, "-nointeractive"];
+      }
+
       const hint = niktoHint(commandArgs);
 
       if (hint) {
         send("log", { line: hint });
       }
+    } else if (name === "curl") {
+      commandArgs = normalizeCurlArgs(args);
+    } else if (name === "openssl") {
+      commandArgs = normalizeOpensslArgs(args);
     }
   } else {
     send("log", { line: `[!] Unknown command: ${argv[0]}` });
@@ -2388,6 +2423,12 @@ app.get("/api/lab/terminal/exec", (req, res) => {
   } catch (error) {
     send("log", { line: `[!] Could not start ${command}: ${error.message}` });
     return finish(false, { code: 1 });
+  }
+
+  // Some tools (openssl s_client) read stdin. Nothing is typed into them here,
+  // so close it - otherwise they block until the three minute guard.
+  if (child.stdin) {
+    child.stdin.end();
   }
 
   let pending = "";
@@ -2433,10 +2474,15 @@ app.get("/api/lab/terminal/exec", (req, res) => {
       }
 
       lineCount += 1;
-      // Strip stray carriage returns (curl's progress meter) and expand tabs so
-      // the transcript stays one line per row.
+      // Strip stray carriage returns (curl's progress meter), expand tabs, and
+      // remove ANSI colour codes (whatweb emits them) so the transcript stays
+      // readable, one line per row.
       send("log", {
-        line: line.replace(/\t/g, "    ").replace(/\r/g, "").trimEnd()
+        line: line
+          .replace(/\t/g, "    ")
+          .replace(/\r/g, "")
+          .replace(/\u001b\[[0-9;]*[A-Za-z]/g, "")
+          .trimEnd()
       });
     }
   };
@@ -2454,7 +2500,12 @@ app.get("/api/lab/terminal/exec", (req, res) => {
     clearTimeout(guard);
 
     if (pending.trim() && lineCount < MAX_LINES) {
-      send("log", { line: pending.replace(/\r/g, "").trimEnd() });
+      send("log", {
+        line: pending
+          .replace(/\r/g, "")
+          .replace(/\u001b\[[0-9;]*[A-Za-z]/g, "")
+          .trimEnd()
+      });
     }
 
     finish(code === 0, { code: code ?? 0 });
