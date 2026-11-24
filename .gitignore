@@ -17,3 +17,6 @@ backups/
 
 # submission archives
 dist/
+
+# credential-bearing access sheets
+docs/PROFESSOR-ADMIN-ACCESS.*
