@@ -599,14 +599,40 @@ Shannon feasibility and measurements: `SHANNON.md`.
 
 ## 13. Report pipeline
 
-The AI report is written to disk and served three ways, all verified:
+Both engines write **Markdown** to disk, and that is the only artifact that
+exists. The routes therefore serve two formats and refuse the rest.
+
+Measured against the live deployment:
 
 ```
-/api/ai-agent/report?format=md    → 200
-/api/ai-agent/report?format=json  → 200
-/api/ai-agent/report?format=pdf   → 200, %PDF-1.4
-/api/ai-agent/report?format=csv   → 404 when there are no findings (correct)
+/api/ai-agent/report?format=md    → 200, 3057 bytes, starts "# AI Agent..."
+/api/ai-agent/report?format=json  → 200, 3292 bytes, {"format":"markdown",...}
+/api/ai-agent/report?format=pdf   → 415, {"error":"...'pdf' is not available"}
+/api/ai-agent/report?format=csv   → 415, {"error":"...'csv' is not available"}
 ```
 
-The Shannon report is served from the bridge's output directory through
-`/api/shannon/report`, content type chosen by extension.
+An earlier build accepted any `format` value and silently returned Markdown
+with a `200`, so `?format=pdf` looked like it had produced a PDF. It had not.
+The route now refuses what it cannot produce instead of substituting something
+else:
+
+```json
+{
+  "error": "The agent report exists only as Markdown and JSON; 'pdf' is not available",
+  "supported": ["md", "json"],
+  "hint": "Use ?download=1 to save the Markdown file."
+}
+```
+
+`?format=json` is a wrapper — `{format, note, bytes, markdown}` — because the
+agent produces no structured output of its own. It is labelled as a wrapper
+rather than presented as native JSON.
+
+The `⬇ Report` button uses `?download=1`, which sets
+`Content-Disposition: attachment` with the correct extension for the chosen
+format.
+
+The Shannon report is different in kind: `/api/shannon/report` proxies to the
+bridge, which picks the newest matching file from `tools/out/shannon/` and sets
+the content type by extension (`.md`, `.pdf`, `.json`, `.sarif`). Shannon
+produces its own deliverables, so those formats are genuinely available there.
