@@ -567,3 +567,104 @@ issues with 0 false positives; the AI agent finds 1, also with 0 false
 positives.** The AI misses the two that need a *measurement over time* — an MFA
 lockout that releases after 31 seconds, and a missing HTTPS redirect that
 requires asking for `http://`. That gap is the finding, not a bug in the demo.
+
+---
+
+## 9. The Attack Lab terminal (nikto, nmap, curl)
+
+Attack Lab is not just a button any more: it has a prompt you can type into.
+
+```
+lab@attack:~$ nikto -h host.docker.internal -p 80 -maxtime 40s
+```
+
+The tools are the ones Kali ships — Kali is a distribution, the tools are just
+packages, so `nikto`, `nmap`, `whatweb`, `dig`, `whois` and `openssl` are
+installed directly into the app image. `nikto` was dropped from Debian bookworm,
+so it is built from the upstream 2.6.1 release.
+
+### 9.1 Commands
+
+| Command | What it does |
+| --- | --- |
+| `help` | List everything below |
+| `clear` | Clear the transcript (client-side, no request) |
+| `pentest` | Run the 12-check manual suite — identical to the button |
+| `nikto -h <host> -p <port>` | Web server scan; add `-maxtime 90s` to bound it |
+| `nmap -sT -p 1-1000 <host>` | Port scan (connect scan: works as the unprivileged `node` user) |
+| `nmap -sV -p 80,443 <host>` | Service and version detection |
+| `curl -i http://<host>/api/health` | Raw request with response headers |
+| `whatweb -a 1 http://<host>` | Fingerprint the stack |
+| `dig <host>` | DNS lookup |
+| `openssl s_client -connect <host>:443` | Inspect the TLS certificate |
+
+Targets are limited to this lab: `shekin.tail97139a.ts.net`,
+`host.docker.internal`, `127.0.0.1`, `localhost`.
+
+### 9.2 Real output, from a run through the browser prompt
+
+```
+lab@attack:~$ nikto -h host.docker.internal -p 80 -maxtime 40s
+[exec] nikto -h host.docker.internal -p 80 -maxtime 40s -nointeractive
+- Nikto v2.6.1
+---------------------------------------------------------------------------
++ Target IP:          192.168.65.254
++ Target Hostname:    host.docker.internal
++ Target Port:        80
++ Platform:           Windows
+---------------------------------------------------------------------------
++ Server: No banner retrieved
++ [000287] /: Retrieved via header: 1.1 Caddy.
++ [999100] /: Uncommon header(s) 'origin-agent-cluster' found, with contents: \?1.
++ [013587] /: Suggested security header missing: permissions-policy.
++ Scan terminated: 0 errors and 3 items reported on the remote host
++ 1 host(s) tested
+```
+
+That is nikto's own output, unmodified: a real version banner, real Caddy
+detection, and real missing-header findings against the running site.
+
+### 9.3 Why it is not a shell
+
+The command line is split into argv and executed with `shell: false`. That means:
+
+- `;`, `|`, `&`, `$`, `` ` ``, `>`, `<`, `\` are **rejected** before execution, and
+  the terminal says so
+- `argv[0]` must be on the allowlist — `bash`, `sh`, `env`, `python` are refused
+- every host argument is extracted and checked against this lab, so the terminal
+  cannot be used to scan a third party
+- the process runs as the unprivileged `node` user with a minimal environment
+  (no database URL, no session secret)
+- output is capped at 4,000 lines / 512 KB and 3 minutes per command
+
+This matters because the site is publicly reachable and registration is open: an
+unrestricted shell behind a login would be remote code execution for anyone who
+signed up. The allowlist keeps it a terminal for the exercise.
+
+Observed rejections:
+
+```
+lab@attack:~$ nikto -h example.com
+[!] Out of scope: example.com
+    This terminal may only target this lab.
+
+lab@attack:~$ curl -i http://host.docker.internal/ ; whoami
+[!] Shell metacharacters are not supported here.
+    Commands run as argv, not through a shell - pass options separately.
+
+lab@attack:~$ bash -c whoami
+[!] Unknown command: bash
+```
+
+### 9.4 How it is wired
+
+| Piece | Detail |
+| --- | --- |
+| Route | `GET /api/lab/terminal/exec?cmd=<url-encoded>` |
+| Auth | `401` without a signed-in session |
+| Transport | Server-Sent Events, `log` per line then `done` with the exit code |
+| Client | `public/attack-lab-terminal.js` — history on Arrow Up/Down, focus handled on screen open |
+| Image | `Dockerfile` installs the tools and nikto 2.6.1 |
+
+Because the browser and this document use the same route, a command typed on the
+phone behaves exactly like the same command typed in a terminal.

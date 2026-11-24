@@ -21,7 +21,7 @@ rather than asserted.
 | 🏦 **Banking** | Accounts, payments, tuition lookup. MFA-enforced. |
 | 🎓 **Acadia Student** | Enrollments, services, tuition summary. MFA-enforced. |
 | 🧪 **AI Pentest** | Terminal that runs an LLM agent against banking, school, or both, then downloads its report. |
-| 🖥️ **Attack Lab** | Manual pentest terminal (12 checks) plus a real SQL injection. |
+| 🖥️ **Attack Lab** | A real terminal: nikto, nmap, curl, whatweb, dig, openssl, the 12-check suite, and a real SQL injection. |
 
 Both applications are real Express routes with PostgreSQL-backed sessions,
 Argon2 password hashing, and TOTP second factors. They are intentionally
