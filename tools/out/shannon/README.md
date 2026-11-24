@@ -41,10 +41,30 @@ limiter counted successful logins, and the same-origin guard rejected requests
 that carried no `Origin` header. Its `authz-exploit` agent could do neither, so
 it slept in 180 s and 600 s retries.
 
-## What is still missing
+## What is still missing, and what stands in for it
 
-Shannon's final consolidated report. It needs one agent run over the deliverables
-above, which needs a working model key. With a key, the same workspace can be
-retried — Shannon reports that re-running a workspace retries only the part that
-failed — and the report appears in this folder, where `/api/shannon/report`
-serves it.
+Shannon's final consolidated report does not exist. Producing it needs one agent
+run over the deliverables above, and that needs a working model key.
+
+As of 24 November 2026 the key in `.env.shannon` is dead. This was established
+rather than assumed: `GET /v1/models` returns `200` with no key at all, and a
+deliberately invalid key receives the *identical* `403 Authorization failed` as
+the real one. The earlier theory that a specific model had been retired was
+wrong — a `410 Gone` on `moonshotai/kimi-k2-instruct` is a pre-authentication
+model check and proves nothing about the credential.
+
+`SHANNON-CONSOLIDATED-REPORT.md` stands in its place. It performs the
+consolidation Shannon's reporting agent would have performed, using only
+Shannon's own deliverables, and labels every claim as *Exploited*, *Analysed* or
+*Verified*. It is a reconstruction and says so in its first section; do not cite
+it as Shannon's output.
+
+Two of its sections are worth reading before the findings: Section 5 documents
+three items the second run reported that are **not** vulnerabilities (two are
+false positives its own first run had correctly marked safe), and Section 9
+quantifies why Shannon's line references do not resolve against the deployed
+`server.js`.
+
+With a working key, the same workspace can be retried — Shannon reports that
+re-running a workspace retries only the part that failed — and its own report
+would appear in this folder, where `/api/shannon/report` serves it.
