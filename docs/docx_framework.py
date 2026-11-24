@@ -133,6 +133,10 @@ REFS = [
                  "(Accessed: 24 November 2026)."),
     ("caddy", "Stack Enterprises (2026) *Caddy 2 Documentation*. Available at: "
               "https://caddyserver.com/docs/ (Accessed: 24 November 2026)."),
+    ("cwe204", "MITRE (2024) *CWE-204: Observable Response Discrepancy*. Available at: "
+               "https://cwe.mitre.org/data/definitions/204.html (Accessed: 24 November 2026)."),
+    ("openrouter", "OpenRouter (2026) *API Reference and Model Catalogue*. Available at: "
+                   "https://openrouter.ai/docs (Accessed: 24 November 2026)."),
 ]
 
 NUM = {key: i + 1 for i, (key, _) in enumerate(REFS)}
