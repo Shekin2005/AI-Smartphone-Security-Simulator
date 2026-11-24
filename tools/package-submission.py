@@ -12,9 +12,9 @@ Design notes
   a database dump or a node_modules folder cannot end up in the archive because
   somebody added it to the working tree.
 * The one live credential in the source (`tools/ai-agent.mjs`, the fallback
-  NVIDIA key) is replaced with an environment-only read that exits if unset.
-  The substitution is verified after staging: if the archive still contains a
-  match for the key pattern, the build fails.
+  NVIDIA key) is KEPT, at the owner's request, so the agent can be demonstrated
+  with no setup. Set KEEP_LAB_KEY = False to strip it instead. The scan still
+  fails on any other credential it finds.
 * Everything is syntax-checked in the staged tree before zipping, so the
   archive cannot contain a file that will not parse.
 """
@@ -133,6 +133,22 @@ if (!LLM_KEY) {
   process.exit(1);
 }'''
 
+# The lab owner wants the free NVIDIA key shipped so the AI agent can be
+# demonstrated with no setup. It is therefore kept, not redacted. Set this to
+# False if the project is ever published publicly.
+KEEP_LAB_KEY = True
+
+
+def lab_key() -> str:
+    """Read the key that is intentionally kept, without hardcoding it here."""
+    try:
+        text = (ROOT / "tools" / "ai-agent.mjs").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    m = re.search(r'"(nvapi-[A-Za-z0-9_-]{20,})"', text)
+    return m.group(1) if m else ""
+
+
 SECRET_PATTERNS = [
     re.compile(r"nvapi-[A-Za-z0-9_-]{20,}"),
     re.compile(r"sk-[A-Za-z0-9]{20,}"),
@@ -207,16 +223,26 @@ node create-scan-account.js --app acadia --role admin \\
   --username professor --password "Acadia-Admin-2026!"
 ```
 
-## Two deliberate differences from the development copy
+## The API key is included
 
-**No API key is included.** The fallback NVIDIA key that shipped in
-`tools/ai-agent.mjs` has been removed, and the agent now exits with a clear
-message if `AI_LLM_KEY` is unset. Get a free key at https://build.nvidia.com and
-pass it as an environment variable. The key was committed to the development
-repository and must be treated as public, so it does not belong in a submission.
+`tools/ai-agent.mjs` carries a free NVIDIA NIM key so the AI agent runs with no
+setup, and it is kept in this submission deliberately so the agent can be
+demonstrated without obtaining a key first. NVIDIA's free tier needs no card.
 
-**Generated bulk is excluded.** `node_modules/`, `backups/`, the Shannon staging
-tree and local environment files are not present. Reinstall dependencies with
+Any run can override it without editing the file:
+
+```bash
+AI_LLM_KEY=nvapi-... node tools/ai-agent.mjs
+```
+
+The key is also present in the development repository, so treat it as public. It
+should be rotated at https://build.nvidia.com before the project is published
+beyond the course.
+
+## Generated bulk is excluded
+
+`node_modules/`, `backups/`, the Shannon staging tree and local environment files
+are not present. Reinstall dependencies with
 `npm install`; the archive is source, not a pre-installed runtime.
 
 ## Documentation
@@ -304,10 +330,13 @@ def main() -> int:
         else:
             copy_tree(src_dir, STAGE / dirname, log)
 
-    # ---- redact the fallback key ----------------------------------------
+    # ---- fallback key: kept by request ----------------------------------
     agent = STAGE / "tools" / "ai-agent.mjs"
     redacted = False
-    if agent.exists():
+    if KEEP_LAB_KEY:
+        present = bool(agent.exists()) and bool(lab_key())
+        print(f"lab key kept in ai-agent.mjs: {present}")
+    elif agent.exists():
         text = agent.read_text(encoding="utf-8")
         new_text, n = KEY_BLOCK_RE.subn(KEY_REPLACEMENT.replace("\\", "\\\\"), text)
         if n:
@@ -325,8 +354,9 @@ def main() -> int:
     print(f"staged {len(log['copied'])} files into {STAGE}")
     if log["missing"]:
         print(f"MISSING ({len(log['missing'])}): {', '.join(log['missing'])}")
-    print(f"key block redacted: {redacted}")
+    print(f"key block redacted: {redacted} (KEEP_LAB_KEY={KEEP_LAB_KEY})")
 
+    allowed = lab_key() if KEEP_LAB_KEY else ""
     leaks = []
     for path in STAGE.rglob("*"):
         if path.is_dir() or path.suffix.lower() in {".png", ".docx", ".pdf", ".xlsx"}:
@@ -339,6 +369,9 @@ def main() -> int:
             for m in pat.finditer(text):
                 # the intentional "nvapi-..." hints are not secrets
                 if set(m.group(0)[6:]) <= {"."}:
+                    continue
+                # the lab key is kept deliberately, per KEEP_LAB_KEY
+                if allowed and m.group(0) == allowed:
                     continue
                 leaks.append(f"{path.relative_to(STAGE)}: {m.group(0)[:18]}...")
 
