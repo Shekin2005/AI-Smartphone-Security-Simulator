@@ -1895,16 +1895,41 @@ app.get("/api/ai-agent/report", (req, res) => {
     });
   }
 
+  // The agent writes one artifact: Markdown. `format` used to be accepted and
+  // silently ignored, which meant ?format=pdf returned Markdown with a 200 - a
+  // lie the caller cannot see. Only what actually exists is served, and
+  // anything else is refused explicitly.
+  const format = String(req.query.format || "md").toLowerCase();
+
+  if (format !== "md" && format !== "json") {
+    return res.status(415).json({
+      error: `The agent report exists only as Markdown and JSON; '${format}' is not available`,
+      supported: ["md", "json"],
+      hint: "Use ?download=1 to save the Markdown file."
+    });
+  }
+
+  const markdown = readFileSync(reportPath, "utf8");
+
   // ?download=1 turns the same response into a file download, so the panel can
   // offer a button instead of rendering raw Markdown in a tab.
   if (req.query.download) {
     res.setHeader(
       "Content-Disposition",
-      'attachment; filename="AI-PENTEST-REPORT.md"'
+      `attachment; filename="AI-PENTEST-REPORT.${format === "json" ? "json" : "md"}"`
     );
   }
 
-  res.type("text/markdown").send(readFileSync(reportPath, "utf8"));
+  if (format === "json") {
+    return res.json({
+      format: "markdown",
+      note: "The agent produces Markdown; this wraps it in JSON for tooling.",
+      bytes: Buffer.byteLength(markdown),
+      markdown
+    });
+  }
+
+  res.type("text/markdown").send(markdown);
 });
 
 // ==================================================
@@ -2717,14 +2742,37 @@ app.get("/api/pentest/report", (req, res) => {
     });
   }
 
+  // Same rule as the agent report: only Markdown exists, so do not accept other
+  // formats and quietly return Markdown anyway.
+  const format = String(req.query.format || "md").toLowerCase();
+
+  if (format !== "md" && format !== "json") {
+    return res.status(415).json({
+      error: `The pentest report exists only as Markdown and JSON; '${format}' is not available`,
+      supported: ["md", "json"],
+      hint: "Use ?download=1 to save the Markdown file."
+    });
+  }
+
+  const markdown = readFileSync(reportPath, "utf8");
+
   if (req.query.download) {
     res.setHeader(
       "Content-Disposition",
-      'attachment; filename="MANUAL-PENTEST-REPORT.md"'
+      `attachment; filename="MANUAL-PENTEST-REPORT.${format === "json" ? "json" : "md"}"`
     );
   }
 
-  res.type("text/markdown").send(readFileSync(reportPath, "utf8"));
+  if (format === "json") {
+    return res.json({
+      format: "markdown",
+      note: "The suite produces Markdown; this wraps it in JSON for tooling.",
+      bytes: Buffer.byteLength(markdown),
+      markdown
+    });
+  }
+
+  res.type("text/markdown").send(markdown);
 });
 
 // ==================================================
