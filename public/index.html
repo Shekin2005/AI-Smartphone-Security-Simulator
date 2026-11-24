@@ -10,6 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1220'/%3E%3Crect x='10' y='6' width='12' height='20' rx='3' fill='none' stroke='%2338e8d0' stroke-width='2'/%3E%3C/svg%3E">
 <script src="./app.js" defer></script>
 <script src="./attack-lab-pentest.js?v=manual-pentest-20261123" defer></script>
+<script src="./attack-lab-exploit.js?v=real-exploit-20261124" defer></script>
 <script src="./acadia-roles.js" defer></script>
 <script src="./school-upgrade.js" defer></script>
 <script src="./school-services.js" defer></script>
@@ -983,11 +984,13 @@
          aria-live="polite"></div>
 
     <p class="note">
-        Fictional attacks only.
-        Risk scores are rule-based until an AI
-        model is trained.
-        Attack history remains available when
-        protection is OFF.
+        These are real attacks on this running
+        application. Every incident in the history
+        below came from an actual HTTP request
+        against the live database — nothing here
+        is scripted output. The data is fictional;
+        the exploitation is not. Attack history
+        remains available when protection is OFF.
     </p>
 
     <!-- ==========================================
@@ -1132,6 +1135,58 @@
                     View the generated report
                 </a>
             </p>
+        </div>
+
+        <!-- ==========================================
+             REAL EXPLOIT - SQL INJECTION
+             Runs a genuine injection against the live
+             database. The parameterised and vulnerable
+             queries are both executed so the difference
+             is measurable, and the leaked rows are real.
+             ========================================== -->
+        <div class="cyber-panel" id="lab-exploit-panel">
+            <div class="cyber-section-heading">
+                <h3>02 / REAL EXPLOIT</h3>
+                <span>LIVE DATABASE</span>
+            </div>
+
+            <p class="cyber-muted">
+                A real SQL injection. Two queries run against PostgreSQL:
+                one parameterised, one with your input concatenated into the
+                statement. Whatever comes back is read from the database.
+                The run is read-only and cannot leave the selected application.
+            </p>
+
+            <label class="cyber-muted" for="lab-exploit-payload">Payload</label>
+            <input id="lab-exploit-payload"
+                   value="' OR '1'='1"
+                   spellcheck="false"
+                   autocomplete="off">
+
+            <label class="cyber-muted" for="lab-exploit-target">Target</label>
+            <select id="lab-exploit-target">
+                <option value="school">Acadia (school)</option>
+                <option value="bank">Banking</option>
+            </select>
+
+            <div class="cyber-actions">
+                <button type="button" id="lab-exploit-run">
+                    ▶ Run Exploit
+                </button>
+            </div>
+
+            <p id="lab-exploit-status" class="cyber-muted">
+                Idle. Sign in, then run.
+            </p>
+
+            <pre id="lab-exploit-output"
+                 aria-live="polite"
+                 style="max-height:300px;overflow:auto;
+                        white-space:pre-wrap;text-align:left;
+                        font-size:12px;line-height:1.55;
+                        margin:0;padding:12px;
+                        border-radius:10px;
+                        background:rgba(0,0,0,0.45);">[SYSTEM] Waiting for an exploit...</pre>
         </div>
 
         <!-- Target selection -->

@@ -1600,6 +1600,148 @@ installSchoolRoutes(app, pool, requireAcadiaRole);
 installSchoolServices(app, pool, requireAcadiaRole);
 
 // ==================================================
+// REAL EXPLOIT - SQL injection
+// ==================================================
+// This is not a simulation. It builds two queries against the live database:
+// one parameterised, one with the input concatenated into the SQL string. The
+// difference between the two results IS the exploit, and the rows it returns
+// are read out of PostgreSQL for real.
+//
+// Containment, so a classroom demonstration cannot become a data breach:
+//   - the target rows are selected first into a MATERIALIZED CTE, so the
+//     injected predicate can only ever re-read rows already scoped to one
+//     application. It cannot reach users, sessions or any other table.
+//   - the whole thing runs inside BEGIN READ ONLY, so a stacked or destructive
+//     payload cannot write.
+//   - input is capped at 64 characters.
+//   - requires a signed-in, MFA-verified session and a recorded consent row.
+//   - disabled unless LAB_VULNERABLE_MODE is exactly "true".
+app.post("/api/lab/exploit/sqli", requireDefenderSession, async (req, res) => {
+  if (process.env.LAB_VULNERABLE_MODE !== "true") {
+    return res.status(403).json({
+      error: "Vulnerable mode is disabled on this deployment"
+    });
+  }
+
+  const target = req.body?.target === "bank" ? "bank" : "school";
+  const input = String(req.body?.input ?? "").slice(0, 64);
+
+  if (!input) {
+    return res.status(400).json({ error: "Provide a payload" });
+  }
+
+  let client;
+
+  try {
+    // Consent is recorded before the read-only transaction opens, because a
+    // read-only transaction cannot insert. This mirrors signing a scope
+    // agreement before testing begins.
+    const consent = await pool.query(
+      "SELECT 1 FROM lab_optin_accounts WHERE user_id=$1 AND target=$2",
+      [req.session.userId, target]
+    );
+
+    if (!consent.rowCount) {
+      await pool.query(
+        "INSERT INTO lab_optin_accounts (user_id, target) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+        [req.session.userId, target]
+      );
+    }
+
+    client = await pool.connect();
+    await client.query("BEGIN READ ONLY");
+
+    // Scope first, inject second. The CTE pins the row set to one target, so an
+    // injected OR can widen the match inside that set but never outside it.
+    const scoped = `WITH scoped AS MATERIALIZED (
+      SELECT id, label, secret FROM lab_sqli_demo WHERE target = $1
+    ) SELECT id, label, secret FROM scoped WHERE label`;
+
+    // The correctly written query: the payload is data, never syntax.
+    const safe = await client.query(`${scoped} = $2 LIMIT 5`, [target, input]);
+
+    // The vulnerable query: the payload becomes part of the SQL statement.
+    const unsafe = await client.query(
+      `${scoped} = '${input}' LIMIT 5`,
+      [target]
+    );
+
+    await client.query("ROLLBACK");
+
+    const exploited = unsafe.rowCount > safe.rowCount;
+    const leaked = unsafe.rows.map(row => ({
+      id: String(row.id),
+      label: row.label,
+      secret: row.secret
+    }));
+
+    // Resolve the actor's name so the attack history is readable rather than
+    // showing a numeric id.
+    const actor = await pool.query(
+      "SELECT username FROM users WHERE id=$1",
+      [req.session.userId]
+    );
+    const actorName =
+      req.session.username || actor.rows[0]?.username || String(req.session.userId);
+
+    // Record it as a real incident so the attack history reflects what happened.
+    await pool.query(
+      `INSERT INTO lab_incidents
+         (actor_user_id, actor_username, target, scenario, mode, record_id,
+          attempted_value, outcome, detail, evidence_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)`,
+      [
+        req.session.userId,
+        actorName,
+        target,
+        "sql_injection",
+        "real",
+        exploited && leaked[0] ? String(leaked[0].id) : null,
+        input,
+        exploited ? "success" : "blocked",
+        exploited
+          ? `Injection returned ${unsafe.rowCount} row(s) where the parameterised query returned ${safe.rowCount}.`
+          : `No rows returned; the parameterised query returned ${safe.rowCount}.`,
+        JSON.stringify({
+          endpoint: "/api/lab/exploit/sqli",
+          safeMatches: safe.rowCount,
+          injectedMatches: unsafe.rowCount,
+          leakedRows: leaked.length
+        })
+      ]
+    );
+
+    res.json({
+      exploit: "sql_injection",
+      target,
+      payload: input,
+      affectedEndpoint: "/api/bank/tuition/student (same pattern)",
+      protectedQuery: { matches: safe.rowCount },
+      vulnerableQuery: { matches: unsafe.rowCount },
+      exploited,
+      exfiltrated: leaked,
+      verdict: exploited
+        ? `Injection succeeded: ${unsafe.rowCount} row(s) leaked where a parameterised query returned ${safe.rowCount}.`
+        : `Injection had no effect; both queries returned ${safe.rowCount} row(s).`
+    });
+  } catch (error) {
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        /* the transaction may already be gone */
+      }
+    }
+
+    fail(res, error);
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+});
+
+// ==================================================
 // AI AGENT - runs the thin 3-tool agent server-side
 // ==================================================
 // This is the same script exposed as `npm run ai` on the command line, so the
