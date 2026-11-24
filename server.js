@@ -83,6 +83,18 @@ pool.on("error", error => {
 
 const app = express();
 
+// The address the in-container scanners (tools/ai-agent.mjs and
+// tools/pentest-suite.mjs) should attack.
+//
+// A public deployment wants PUBLIC_ORIGIN. A local Docker stack cannot use it:
+// PUBLIC_ORIGIN points at Caddy, which is a separate container, so from inside
+// the app "localhost" is the app itself and nothing is listening on port 80.
+// Compose therefore sets TOOL_BASE_URL to the loopback address.
+const TOOL_BASE =
+  process.env.TOOL_BASE_URL ||
+  process.env.PUBLIC_ORIGIN ||
+  `http://127.0.0.1:${process.env.PORT || 3000}`;
+
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
@@ -113,7 +125,13 @@ app.use(session({
   cookie: {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    // Only mark the cookie Secure when the public origin is actually HTTPS.
+    // NODE_ENV is "production" inside Docker whether or not TLS is in front of
+    // it, so keying off that alone made a plain-HTTP local stack discard every
+    // session cookie and fail at the MFA step.
+    secure:
+      (process.env.PUBLIC_ORIGIN || "").startsWith("https://") ||
+      (!process.env.PUBLIC_ORIGIN && process.env.NODE_ENV === "production"),
     maxAge: 15 * 60 * 1000
   }
 }));
@@ -1841,12 +1859,9 @@ app.get("/api/ai-agent/run", (req, res) => {
     fileURLToPath(import.meta.url)
   );
 
-  // The public HTTPS URL is used rather than http://127.0.0.1:3000 on
-  // purpose: the session cookie is marked Secure, so Express will not
-  // issue it over plain HTTP and every login would fail at the MFA step.
-  const target =
-    process.env.PUBLIC_ORIGIN ||
-    "https://shekin.tail97139a.ts.net";
+  // TOOL_BASE, not PUBLIC_ORIGIN: in a local stack the public origin points at
+  // Caddy in a different container and is unreachable from in here.
+  const target = TOOL_BASE;
 
   // Hand the agent the caller's own session so it does not log in a second
   // time. The caller is already MFA-verified (that is how they reached this
@@ -2016,8 +2031,7 @@ app.get("/api/pentest/run", (req, res) => {
 
   // The public HTTPS URL rather than loopback: the session cookie is Secure, so
   // Express will not issue it over plain HTTP and every login would fail.
-  const target =
-    process.env.PUBLIC_ORIGIN || "https://shekin.tail97139a.ts.net";
+  const target = TOOL_BASE;
 
   send("start", { target });
 
@@ -2690,8 +2704,7 @@ app.get("/api/lab/terminal/exec", (req, res) => {
         TMPDIR: "/tmp",
         TERM: "dumb",
         LANG: "C.UTF-8",
-        PENTEST_BASE:
-          process.env.PUBLIC_ORIGIN || "https://shekin.tail97139a.ts.net",
+        PENTEST_BASE: TOOL_BASE,
         PENTEST_OUT_DIR: path.join(root, "tools", "out")
       }
     });

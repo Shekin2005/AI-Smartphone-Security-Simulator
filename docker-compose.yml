@@ -81,6 +81,11 @@ services:
       # Must match the URL the browser uses, or every POST returns 403.
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost}
 
+      # Address the in-container scanners attack. The public origin above is
+      # Caddy, in a different container, so the tools reach the app directly
+      # on its own port instead.
+      TOOL_BASE_URL: ${TOOL_BASE_URL:-http://127.0.0.1:3000}
+
       # Lab flags
       LAB_VULNERABLE_MODE: ${LAB_VULNERABLE_MODE:-true}
       LAB_RECOVERY_DATABASE_URL: ${LAB_RECOVERY_DATABASE_URL:-}
