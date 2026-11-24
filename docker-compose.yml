@@ -62,7 +62,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ai-smartphone-app:1.0.0
+    image: ${APP_IMAGE:-ai-smartphone-app:1.0.0}
     container_name: ${APP_CONTAINER:-sim-app}
     restart: unless-stopped
 

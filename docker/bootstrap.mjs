@@ -94,27 +94,45 @@ function sqlFiles() {
 }
 
 async function applySchema(pool) {
-  const files = sqlFiles();
-  if (!files.length) {
+  let pending = sqlFiles();
+  if (!pending.length) {
     log("no .sql files found in the image; skipping schema");
     return;
   }
 
+  const total = pending.length;
   let applied = 0;
-  const failed = [];
+  let errors = new Map();
 
-  for (const file of files) {
-    const sql = fs.readFileSync(file.path, "utf8");
-    try {
-      await pool.query(sql);
-      applied += 1;
-    } catch (error) {
-      failed.push(`${file.name}: ${error.message.split("\n")[0]}`);
+  // The files are not numbered and their dependencies do not follow
+  // alphabetical order: school-upgrade.sql creates acadia_catalog and
+  // acadia_enrollments, but sorts after four files that read those tables.
+  // So each failure is retried on the next pass, and passes repeat until one
+  // makes no progress. That resolves any ordering without hard-coding it.
+  for (let pass = 1; pass <= 5 && pending.length; pass += 1) {
+    const stillFailing = [];
+    let progressed = 0;
+
+    for (const file of pending) {
+      const sql = fs.readFileSync(file.path, "utf8");
+      try {
+        await pool.query(sql);
+        applied += 1;
+        progressed += 1;
+        errors.delete(file.name);
+      } catch (error) {
+        errors.set(file.name, error.message.split("\n")[0]);
+        stillFailing.push(file);
+      }
     }
+
+    pending = stillFailing;
+    if (!progressed) break;
+    if (pending.length) log(`schema: pass ${pass} applied ${progressed}, retrying ${pending.length}`);
   }
 
-  log(`schema: ${applied}/${files.length} file(s) applied`);
-  for (const f of failed) log(`  skipped ${f}`);
+  log(`schema: ${applied}/${total} file(s) applied`);
+  for (const [name, message] of errors) log(`  skipped ${name}: ${message}`);
 
   const check = await pool.query(
     "SELECT to_regclass('public.users') IS NOT NULL AS present"
