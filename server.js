@@ -2046,7 +2046,10 @@ const TERMINAL_HELP = [
   "  clear                                 clear the screen",
   "  pentest                               run the 12-check manual suite",
   "",
-  "  nikto -h host -p 80 -maxtime 90s      web server scan",
+  "  nikto -h host.docker.internal -p 80   full scan of this site (recommended)",
+  "  nikto -h https://host/                URL form is also accepted",
+  "  nikto -h host -p 80 -maxtime 90s      bounded scan",
+  "  nikto -h host -p 443 -ssl             HTTPS scan, if you need the TLS layer",
   "  nmap -sT -p 1-1000 host               port scan",
   "  nmap -sV -p 80,443 host               service versions",
   "  curl -i http://host/api/health        raw HTTP request",
@@ -2056,7 +2059,11 @@ const TERMINAL_HELP = [
   "",
   "Targets must be this lab: shekin.tail97139a.ts.net, host.docker.internal,",
   "127.0.0.1, localhost. Shell features (; | & $ ` > <) are not supported -",
-  "the command is run as argv, not through a shell."
+  "the command is run as argv, not through a shell.",
+  "",
+  "Prefer host.docker.internal port 80. The public hostname resolves to the",
+  "Tailscale tunnel inside this container, and the funnel drops nikto's rapid",
+  "TLS reconnects, so an HTTPS scan aborts early with 'ssl connect failed'."
 ];
 
 // Splits a command line into argv, honouring single and double quotes.
@@ -2136,6 +2143,84 @@ function terminalHostOf(token) {
   }
 
   return value.toLowerCase();
+}
+
+// nikto expects `-h host` plus a separate `-p port` and `-ssl`, not the URL you
+// would paste into a browser. Translate the URL form into those flags so both
+// spellings behave the same.
+function normalizeNiktoArgs(args) {
+  const out = [...args];
+  const at = out.indexOf("-h");
+
+  if (at === -1 || at + 1 >= out.length) {
+    return out;
+  }
+
+  const raw = String(out[at + 1]).trim();
+  const withScheme = /^(https?):\/\//i.exec(raw);
+
+  if (!withScheme) {
+    // Already a bare host: only drop a trailing slash.
+    out[at + 1] = raw.replace(/\/+$/, "");
+    return out;
+  }
+
+  const scheme = withScheme[1].toLowerCase();
+  let authority = raw.slice(withScheme[0].length).split(/[/?#]/)[0];
+
+  authority = authority.split("@").pop();
+
+  let port = scheme === "https" ? "443" : "80";
+  const explicit = /^(.*):(\d+)$/.exec(authority);
+
+  if (explicit) {
+    authority = explicit[1];
+    port = explicit[2];
+  }
+
+  out[at + 1] = authority;
+
+  if (!out.includes("-p")) {
+    out.push("-p", port);
+  }
+
+  if (scheme === "https" && !out.includes("-ssl")) {
+    out.push("-ssl");
+  }
+
+  return out;
+}
+
+// The public hostname resolves to the Tailscale address inside the container, so
+// nikto scans down the tunnel. The funnel drops its rapid TLS reconnects and the
+// scan aborts with an error limit after about 160 requests. That looks like nikto
+// is broken when it is the network path, so say so and name the command that
+// does produce a full scan.
+function niktoHint(args) {
+  const at = args.indexOf("-h");
+
+  if (at === -1 || at + 1 >= args.length) {
+    return null;
+  }
+
+  if (terminalHostOf(args[at + 1]) !== "shekin.tail97139a.ts.net") {
+    return null;
+  }
+
+  const portAt = args.indexOf("-p");
+  const port = portAt !== -1 && args[portAt + 1] ? args[portAt + 1] : "80";
+
+  if (port !== "443") {
+    return null;
+  }
+
+  return [
+    "[hint] shekin.tail97139a.ts.net points at the Tailscale tunnel from inside",
+    "       this container. The funnel drops nikto's rapid TLS reconnects, so the",
+    "       scan stops around 160 requests with 20 'ssl connect failed' errors.",
+    "       For a complete scan of the same Caddy instance, scan HTTP directly:",
+    "         nikto -h host.docker.internal -p 80"
+  ].join("\n");
 }
 
 app.get("/api/lab/terminal/exec", (req, res) => {
@@ -2259,11 +2344,19 @@ app.get("/api/lab/terminal/exec", (req, res) => {
     ];
   } else if (Object.prototype.hasOwnProperty.call(TERMINAL_BINARIES, name)) {
     command = name;
-    commandArgs = args;
+    commandArgs = name === "nikto" ? normalizeNiktoArgs(args) : args;
 
     // nikto can stop to ask about its database; this keeps it unattended.
-    if (name === "nikto" && !args.includes("-nointeractive")) {
-      commandArgs = [...args, "-nointeractive"];
+    if (name === "nikto" && !commandArgs.includes("-nointeractive")) {
+      commandArgs = [...commandArgs, "-nointeractive"];
+    }
+
+    if (name === "nikto") {
+      const hint = niktoHint(commandArgs);
+
+      if (hint) {
+        send("log", { line: hint });
+      }
     }
   } else {
     send("log", { line: `[!] Unknown command: ${argv[0]}` });
