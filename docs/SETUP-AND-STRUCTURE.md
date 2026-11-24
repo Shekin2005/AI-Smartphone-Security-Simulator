@@ -231,7 +231,16 @@ This runs on the host with Node and connects to the database directly on `localh
 
 The script prints the TOTP secret it generated. Write it down: without it you cannot compute login codes, and the API tests cannot authenticate. Re-running the script resets the password, issues a new secret and clears the replay counter, so it is safe to repeat.
 
-If you need an Acadia administrator, `create-admin.js` prompts for a username and password interactively and inserts an `admin` row. It requires a real terminal, so run it on the host rather than through `docker compose run`.
+If you need an Acadia administrator, the same script provisions one with a known TOTP secret. The `--role admin` flag is what distinguishes an administrator from a student, and it is accepted only for the `acadia` application:
+
+```bash
+DATABASE_URL="postgresql://smartphone:pw@localhost:5432/smartphone_security" \
+TOTP_ENCRYPTION_KEY="<the same 64 hex characters from .env.stack>" \
+node create-scan-account.js --app acadia --role admin \
+  --username professor --password "Acadia-Admin-2026!"
+```
+
+Administrators sign in through the **Administrator Login** card in the Acadia app, not the student form, and the login API requires the role to match the stored value: an administrator's credentials are rejected by the student form by design. `create-admin.js` is the older interactive alternative; it prompts for a username and password and inserts an `admin` row, but it does not enrol MFA, so the account stops at the enrolment step on first login.
 
 ## 6.9 Sign in
 

@@ -158,7 +158,7 @@ file is the short version and the map.
 | `tools/` | Deterministic suite, LLM agent, comparison builder, Shannon bridge, TOTP helper |
 | `tools/out/` | Recorded evidence from the runs described in the report |
 | `configs/shannon-lab.yaml` | Login flow for the multi-agent scanner |
-| `docs/` | The written report, the setup guide and screenshots |
+| `docs/` | The written report, the setup guide, the administrator access sheet and screenshots |
 | `slides/` | Deck builders and their verification scripts |
 
 ## Running it
@@ -181,6 +181,31 @@ DATABASE_URL=... TOTP_ENCRYPTION_KEY=... \\
 including the two mistakes that cost the most time: `localhost` inside a
 container means the container, and `PUBLIC_ORIGIN` must match the browser URL
 exactly or every POST returns 403.
+
+## Administrator access
+
+The university portal has a separate administrator sign-in. A working administrator
+account is provisioned on the live deployment, and the full instructions are in
+`docs/PROFESSOR-ADMIN-ACCESS.pdf` (5 pages), with a scannable enrolment QR code at
+`docs/screens/admin-totp-qr.png`.
+
+| Step | Action |
+| 1 | Open the site, unlock the phone with passcode `1234` |
+| 2 | Open the **Acadia University** app |
+| 3 | Choose **Administrator Login**, not Student Login |
+| 4 | Sign in with the credentials in the PDF, then enter the current six-digit code |
+
+The administrator role is enforced on the server: a student session calling
+`/api/school/admin/students` receives `403 Access denied for this account role`.
+
+On a fresh database there are no users at all, so an administrator must be created
+before anyone can sign in. Note the `--role admin` flag, which is what makes the
+account an administrator rather than a student:
+
+```bash
+node create-scan-account.js --app acadia --role admin \\
+  --username professor --password "Acadia-Admin-2026!"
+```
 
 ## Two deliberate differences from the development copy
 
