@@ -12,6 +12,7 @@
 <script src="./app.js" defer></script>
 <script src="./attack-lab-pentest.js?v=manual-pentest-20261123" defer></script>
 <script src="./attack-lab-exploit.js?v=real-exploit-20261124" defer></script>
+<script src="./attack-lab-terminal.js?v=terminal-20261124" defer></script>
 <script src="./acadia-roles.js" defer></script>
 <script src="./school-upgrade.js" defer></script>
 <script src="./school-services.js" defer></script>
@@ -1003,6 +1004,19 @@
     <pre id="lab-pentest-output"
          class="pt-terminal"
          aria-live="polite">[idle] waiting for a run...</pre>
+
+    <!-- A real prompt. Commands are split into argv and run without a shell,
+         with the binary allowlisted and targets restricted to this lab, so this
+         is a terminal for the exercise rather than an open shell on a public site. -->
+    <div class="pt-prompt">
+        <span class="pt-prompt-label">lab@attack:~$</span>
+        <input id="lab-term-input"
+               autocomplete="off"
+               spellcheck="false"
+               autocapitalize="off"
+               placeholder="type help"
+               aria-label="Terminal command">
+    </div>
 
     <span class="pt-label">Real SQL injection</span>
 

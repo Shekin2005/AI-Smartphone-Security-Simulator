@@ -2006,6 +2006,368 @@ app.get("/api/pentest/run", (req, res) => {
   });
 });
 
+// ==================================================
+// ATTACK LAB TERMINAL - run real tools
+// ==================================================
+// This backs the prompt on the Attack Lab screen. It is deliberately NOT a
+// shell: the line is split into argv and spawned with shell:false, argv[0] must
+// be on an allowlist, shell metacharacters are rejected, and every host
+// argument must name this lab. Registration is open on a publicly reachable
+// site, so an unrestricted shell here would be remote code execution for
+// anyone who signed up.
+// ==================================================
+
+const TERMINAL_BINARIES = {
+  nikto: "web server scanner",
+  nmap: "port and service scanner",
+  curl: "HTTP client",
+  whatweb: "web application fingerprinting",
+  dig: "DNS lookup",
+  host: "DNS lookup",
+  nslookup: "DNS lookup",
+  whois: "domain registration lookup",
+  openssl: "TLS inspection"
+};
+
+// The only machines this terminal may touch. Without this it would be a free
+// scanning proxy for any third party.
+const TERMINAL_HOSTS = new Set([
+  "shekin.tail97139a.ts.net",
+  "host.docker.internal",
+  "127.0.0.1",
+  "localhost",
+  "::1"
+]);
+
+const TERMINAL_HELP = [
+  "Attack Lab terminal - real tools, real output.",
+  "",
+  "  help                                  this list",
+  "  clear                                 clear the screen",
+  "  pentest                               run the 12-check manual suite",
+  "",
+  "  nikto -h host -p 80 -maxtime 90s      web server scan",
+  "  nmap -sT -p 1-1000 host               port scan",
+  "  nmap -sV -p 80,443 host               service versions",
+  "  curl -i http://host/api/health        raw HTTP request",
+  "  whatweb -a 1 http://host              fingerprint the stack",
+  "  dig host                              DNS lookup",
+  "  openssl s_client -connect host:443    TLS inspection",
+  "",
+  "Targets must be this lab: shekin.tail97139a.ts.net, host.docker.internal,",
+  "127.0.0.1, localhost. Shell features (; | & $ ` > <) are not supported -",
+  "the command is run as argv, not through a shell."
+];
+
+// Splits a command line into argv, honouring single and double quotes.
+function terminalTokenize(line) {
+  const out = [];
+  let current = "";
+  let started = false;
+  let quote = null;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        current += ch;
+      }
+
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      started = true;
+      continue;
+    }
+
+    if (ch === " " || ch === "\t") {
+      if (started || current) {
+        out.push(current);
+        current = "";
+        started = false;
+      }
+
+      continue;
+    }
+
+    current += ch;
+  }
+
+  if (quote) {
+    throw new Error("Unbalanced quote in the command");
+  }
+
+  if (started || current) {
+    out.push(current);
+  }
+
+  return out;
+}
+
+// Pulls the host out of a bare hostname, host:port, or URL.
+function terminalHostOf(token) {
+  let value = String(token).trim();
+
+  value = value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  value = value.replace(/^\/\//, "");
+  value = value.split("/")[0].split("?")[0].split("#")[0];
+
+  const at = value.lastIndexOf("@");
+
+  if (at !== -1) {
+    value = value.slice(at + 1);
+  }
+
+  if (value.startsWith("[")) {
+    const end = value.indexOf("]");
+
+    return (end === -1 ? value.slice(1) : value.slice(1, end)).toLowerCase();
+  }
+
+  const colon = value.indexOf(":");
+
+  if (colon !== -1) {
+    value = value.slice(0, colon);
+  }
+
+  return value.toLowerCase();
+}
+
+app.get("/api/lab/terminal/exec", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in first" });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  if (typeof res.flushHeaders === "function") {
+    res.flushHeaders();
+  }
+
+  let child = null;
+
+  const send = (event, payload) => {
+    if (res.writableEnded) {
+      return;
+    }
+
+    res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  const finish = (ok, extra = {}) => {
+    send("done", { ok, ...extra });
+
+    if (!res.writableEnded) {
+      res.end();
+    }
+  };
+
+  // If the browser goes away, stop the tool with it.
+  res.on("close", () => {
+    if (child && child.exitCode === null && !child.killed) {
+      child.kill("SIGTERM");
+    }
+  });
+
+  const raw = String(req.query.cmd || "").trim();
+
+  if (!raw) {
+    send("log", { line: "Type a command. Try: help" });
+    return finish(true, { code: 0 });
+  }
+
+  if (raw.length > 300) {
+    send("log", { line: "[!] Command too long (max 300 characters)." });
+    return finish(false, { code: 1 });
+  }
+
+  if (/[;&|`$<>\n\r\\]/.test(raw)) {
+    send("log", { line: "[!] Shell metacharacters are not supported here." });
+    send("log", { line: "    Commands run as argv, not through a shell - pass options separately." });
+    return finish(false, { code: 2 });
+  }
+
+  let argv;
+
+  try {
+    argv = terminalTokenize(raw);
+  } catch (error) {
+    send("log", { line: `[!] ${error.message}` });
+    return finish(false, { code: 2 });
+  }
+
+  if (!argv.length) {
+    return finish(true, { code: 0 });
+  }
+
+  const name = path.basename(argv[0]).toLowerCase();
+  const args = argv.slice(1);
+
+  if (name === "help") {
+    for (const line of TERMINAL_HELP) {
+      send("log", { line });
+    }
+
+    return finish(true, { code: 0 });
+  }
+
+  // Every non-flag argument that looks like a host must be this lab.
+  for (const token of args) {
+    if (token.startsWith("-")) {
+      continue;
+    }
+
+    // A bare number, port or range is a value, not a target.
+    if (/^\d+([,-]\d+)*$/.test(token)) {
+      continue;
+    }
+
+    const looksLikeHost =
+      token.includes(".") ||
+      token.includes(":") ||
+      TERMINAL_HOSTS.has(token.toLowerCase());
+
+    if (!looksLikeHost) {
+      continue; // e.g. openssl's "s_client" sub-command
+    }
+
+    const host = terminalHostOf(token);
+
+    if (host && !TERMINAL_HOSTS.has(host)) {
+      send("log", { line: `[!] Out of scope: ${host}` });
+      send("log", { line: "    This terminal may only target this lab." });
+      send("log", { line: `    Allowed: ${[...TERMINAL_HOSTS].join(", ")}` });
+      return finish(false, { code: 3 });
+    }
+  }
+
+  let command;
+  let commandArgs;
+
+  if (name === "pentest") {
+    command = process.execPath;
+    commandArgs = [
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "tools", "pentest-suite.mjs")
+    ];
+  } else if (Object.prototype.hasOwnProperty.call(TERMINAL_BINARIES, name)) {
+    command = name;
+    commandArgs = args;
+
+    // nikto can stop to ask about its database; this keeps it unattended.
+    if (name === "nikto" && !args.includes("-nointeractive")) {
+      commandArgs = [...args, "-nointeractive"];
+    }
+  } else {
+    send("log", { line: `[!] Unknown command: ${argv[0]}` });
+    send("log", {
+      line: `    Available: ${Object.keys(TERMINAL_BINARIES).join(", ")}, help, clear, pentest`
+    });
+    return finish(false, { code: 127 });
+  }
+
+  send("log", { line: `[exec] ${[command, ...commandArgs].join(" ")}` });
+
+  const root = path.dirname(fileURLToPath(import.meta.url));
+
+  try {
+    child = spawn(command, commandArgs, {
+      shell: false,
+      cwd: "/tmp",
+      env: {
+        PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        HOME: "/tmp",
+        TMPDIR: "/tmp",
+        TERM: "dumb",
+        LANG: "C.UTF-8",
+        PENTEST_BASE:
+          process.env.PUBLIC_ORIGIN || "https://shekin.tail97139a.ts.net",
+        PENTEST_OUT_DIR: path.join(root, "tools", "out")
+      }
+    });
+  } catch (error) {
+    send("log", { line: `[!] Could not start ${command}: ${error.message}` });
+    return finish(false, { code: 1 });
+  }
+
+  let pending = "";
+  let lineCount = 0;
+  let byteCount = 0;
+
+  const MAX_LINES = 4000;
+  const MAX_BYTES = 512 * 1024;
+  const guard = setTimeout(() => {
+    if (child.exitCode === null && !child.killed) {
+      send("log", { line: "[!] Command exceeded 3 minutes - stopping it." });
+      child.kill("SIGTERM");
+    }
+  }, 180000);
+
+  const emit = chunk => {
+    if (res.writableEnded) {
+      return;
+    }
+
+    byteCount += chunk.length;
+
+    if (byteCount > MAX_BYTES) {
+      send("log", {
+        line: `[!] Output limit reached (${Math.round(MAX_BYTES / 1024)} KB) - stopping the command.`
+      });
+
+      if (child.exitCode === null && !child.killed) {
+        child.kill("SIGTERM");
+      }
+
+      return;
+    }
+
+    pending += chunk.toString();
+
+    const parts = pending.split(/\r?\n/);
+    pending = parts.pop() ?? "";
+
+    for (const line of parts) {
+      if (lineCount >= MAX_LINES) {
+        return;
+      }
+
+      lineCount += 1;
+      // Strip stray carriage returns (curl's progress meter) and expand tabs so
+      // the transcript stays one line per row.
+      send("log", {
+        line: line.replace(/\t/g, "    ").replace(/\r/g, "").trimEnd()
+      });
+    }
+  };
+
+  child.stdout.on("data", emit);
+  child.stderr.on("data", emit);
+
+  child.on("error", error => {
+    clearTimeout(guard);
+    send("log", { line: `[!] ${error.message}` });
+    finish(false, { code: 1 });
+  });
+
+  child.on("close", code => {
+    clearTimeout(guard);
+
+    if (pending.trim() && lineCount < MAX_LINES) {
+      send("log", { line: pending.replace(/\r/g, "").trimEnd() });
+    }
+
+    finish(code === 0, { code: code ?? 0 });
+  });
+});
+
 // Serves PENTEST-REPORT.md to the Attack Lab, mirroring the AI report route.
 app.get("/api/pentest/report", (req, res) => {
   if (!req.session.userId) {

@@ -34,13 +34,35 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
-# tini reaps child processes and forwards SIGTERM cleanly
+# tini reaps child processes and forwards SIGTERM cleanly.
+# The pentest tools below are the same ones Kali ships; Kali is a distro, the
+# tools are just packages, so they install here without pulling in Kali.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         tini \
         curl \
         ca-certificates \
+        perl \
+        libnet-ssleay-perl \
+        libxml-writer-perl \
+        libjson-perl \
+        nmap \
+        whatweb \
+        dnsutils \
+        whois \
     && rm -rf /var/lib/apt/lists/*
+
+# nikto was dropped from Debian bookworm, so install the upstream release.
+# It is pure Perl, so no compiler or build stage is needed here.
+ARG NIKTO_VERSION=2.6.1
+RUN curl -fsSL -o /tmp/nikto.tgz \
+        "https://github.com/sullo/nikto/archive/refs/tags/${NIKTO_VERSION}.tar.gz" \
+    && tar -xzf /tmp/nikto.tgz -C /opt \
+    && mv "/opt/nikto-${NIKTO_VERSION}" /opt/nikto \
+    && ln -sf /opt/nikto/program/nikto.pl /usr/local/bin/nikto \
+    && rm -f /tmp/nikto.tgz \
+    && chmod -R a+rX /opt/nikto \
+    && nikto -Version
 
 COPY --from=deps /app/node_modules ./node_modules
 
