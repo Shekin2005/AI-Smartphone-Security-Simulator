@@ -1,0 +1,6 @@
+- Nikto v2.6.1/
++ Target Host: host.docker.internal
++ Target Port: 80
++ GET /: Retrieved via header: 1.1 Caddy.
++ GET /: Uncommon header(s) 'origin-agent-cluster' found, with contents: \?1.
++ GET /: Suggested security header missing: permissions-policy. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy: 

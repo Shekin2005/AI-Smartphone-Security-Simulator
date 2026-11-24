@@ -1,0 +1,17 @@
+- Nikto v2.6.1
+---------------------------------------------------------------------------
++ Target IP:          192.168.65.254
++ Target Hostname:    host.docker.internal
++ Target Port:        80
++ Platform:           Windows
++ Start Time:         2026-11-24 08:34:10 (GMT0)
+---------------------------------------------------------------------------
++ Server: No banner retrieved
++ [000287] /: Retrieved via header: 1.1 Caddy.
++ [999100] /: Uncommon header(s) 'origin-agent-cluster' found, with contents: \?1.
++ No CGI Directories found (use '-C all' to force check all possible dirs). CGI tests skipped.
++ [013587] /: Suggested security header missing: permissions-policy. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy
++ 7970 requests: 0 errors and 3 items reported on the remote host
++ End Time:           2026-11-24 08:35:12 (GMT0) (62 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested

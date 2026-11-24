@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.93 scan initiated Tue Nov 24 08:31:40 2026 as: nmap -sT -p 80,443,3000,5432 -sV -&#45;version-light -oN /tmp/nmap-report.txt -oX /tmp/nmap-report.xml host.docker.internal -->
+<nmaprun scanner="nmap" args="nmap -sT -p 80,443,3000,5432 -sV -&#45;version-light -oN /tmp/nmap-report.txt -oX /tmp/nmap-report.xml host.docker.internal" start="1795509100" startstr="Tue Nov 24 08:31:40 2026" version="7.93" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="4" services="80,443,3000,5432"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="192.168.65.254" addrtype="ipv4"/>
+<hostnames>
+<hostname name="host.docker.internal" type="user"/>
+</hostnames>
+</hosthint>
+<host starttime="1795509102" endtime="1795509119"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="192.168.65.254" addrtype="ipv4"/>
+<hostnames>
+<hostname name="host.docker.internal" type="user"/>
+</hostnames>
+<ports><port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" servicefp="SF-Port80-TCP:V=7.93%I=2%D=11/24%Time=6B054B75%P=x86_64-pc-linux-gnu%r(GetRequest,A1ED,&quot;HTTP/1\.0\x20200\x20OK\r\nAccept-Ranges:\x20bytes\r\nCache-Control:\x20public,\x20max-age=0\r\nContent-Length:\x2040502\r\nContent-Security-Policy:\x20default-src\x20&apos;self&apos;;base-uri\x20&apos;self&apos;;font-src\x20&apos;self&apos;\x20https:\x20data:;form-action\x20&apos;self&apos;;frame-ancestors\x20&apos;self&apos;;img-src\x20&apos;self&apos;\x20data:;object-src\x20&apos;none&apos;;script-src\x20&apos;self&apos;;script-src-attr\x20&apos;none&apos;;style-src\x20&apos;self&apos;\x20https:\x20&apos;unsafe-inline&apos;;upgrade-insecure-requests\r\nContent-Type:\x20text/html;\x20charset=utf-8\r\nCross-Origin-Opener-Policy:\x20same-origin\r\nCross-Origin-Resource-Policy:\x20same-origin\r\nDate:\x20Tue,\x2024\x20Nov\x202026\x2008:31:49\x20GMT\r\nEtag:\x20W/\&quot;9e36-1a20c920590\&quot;\r\nLast-Modified:\x20Tue,\x2024\x20Nov\x202026\x2008:00:26\x20GMT\r\nOrigin-Agent-Cluster:\x20\?1\r\nReferrer-Policy:\x20no-referrer\r\nStrict-Transport-Security:\x20max-age=31536000;\x20includeSubDomains\r\nVary:\x20Accept-Encoding\r\nVia:\x201\.1\x20Caddy\r\nX-Content-Type-Options:\x20nosniff\r\nX-Dns-Prefetch-Control:\x20off\r\nX-Download-Options:\x20noopen\r\nX-Frame-Options:\x20SAMEORIGIN\r\nX-Permitted-C&quot;)%r(HTTPOptions,2C9,&quot;HTTP/1\.0\x20404\x20Not\x20Found\r\nContent-Length:\x20143\r\nContent-Security-Policy:\x20default-src\x20&apos;none&apos;\r\nContent-Type:\x20text/html;\x20charset=utf-8\r\nCross-Origin-Opener-Policy:\x20same-origin\r\nCross-Origin-Resource-Policy:\x20same-origin\r\nDate:\x20Tue,\x2024\x20Nov\x202026\x2008:31:49\x20GMT\r\nOrigin-Agent-Cluster:\x20\?1\r\nReferrer-Policy:\x20no-referrer\r\nStrict-Transport-Security:\x20max-age=31536000;\x20includeSubDomains\r\nVia:\x201\.1\x20Caddy\r\nX-Content-Type-Options:\x20nosniff\r\nX-Dns-Prefetch-Control:\x20off\r\nX-Download-Options:\x20noopen\r\nX-Frame-Options:\x20SAMEORIGIN\r\nX-Permitted-Cross-Domain-Policies:\x20none\r\nX-Xss-Protection:\x200\r\n\r\n&lt;!DOCTYPE\x20html&gt;\n&lt;html\x20lang=\&quot;en\&quot;&gt;\n&lt;head&gt;\n&lt;meta\x20charset=\&quot;utf-8\&quot;&gt;\n&lt;title&gt;Error&lt;/title&gt;\n&lt;/head&gt;\n&lt;body&gt;\n&lt;pre&gt;Cannot\x20OPTIONS\x20/&lt;/pre&gt;\n&lt;/body&gt;\n&lt;/html&gt;\n&quot;)%r(RTSPRequest,67,&quot;HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request&quot;);" method="table" conf="3"/></port>
+<port protocol="tcp" portid="443"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="3000"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="ppp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="5432"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="postgresql" product="PostgreSQL DB" version="9.6.0 or later" method="probed" conf="10"><cpe>cpe:/a:postgresql:postgresql</cpe></service></port>
+</ports>
+<times srtt="9118" rttvar="5084" to="100000"/>
+</host>
+<runstats><finished time="1795509119" timestr="Tue Nov 24 08:31:59 2026" summary="Nmap done at Tue Nov 24 08:31:59 2026; 1 IP address (1 host up) scanned in 19.71 seconds" elapsed="19.71" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

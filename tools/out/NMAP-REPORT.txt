@@ -1,0 +1,45 @@
+# Nmap 7.93 scan initiated Tue Nov 24 08:31:40 2026 as: nmap -sT -p 80,443,3000,5432 -sV --version-light -oN /tmp/nmap-report.txt -oX /tmp/nmap-report.xml host.docker.internal
+Nmap scan report for host.docker.internal (192.168.65.254)
+Host is up (0.0091s latency).
+
+PORT     STATE  SERVICE    VERSION
+80/tcp   open   http?
+443/tcp  closed https
+3000/tcp closed ppp
+5432/tcp open   postgresql PostgreSQL DB 9.6.0 or later
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port80-TCP:V=7.93%I=2%D=11/24%Time=6B054B75%P=x86_64-pc-linux-gnu%r(Get
+SF:Request,A1ED,"HTTP/1\.0\x20200\x20OK\r\nAccept-Ranges:\x20bytes\r\nCach
+SF:e-Control:\x20public,\x20max-age=0\r\nContent-Length:\x2040502\r\nConte
+SF:nt-Security-Policy:\x20default-src\x20'self';base-uri\x20'self';font-sr
+SF:c\x20'self'\x20https:\x20data:;form-action\x20'self';frame-ancestors\x2
+SF:0'self';img-src\x20'self'\x20data:;object-src\x20'none';script-src\x20'
+SF:self';script-src-attr\x20'none';style-src\x20'self'\x20https:\x20'unsaf
+SF:e-inline';upgrade-insecure-requests\r\nContent-Type:\x20text/html;\x20c
+SF:harset=utf-8\r\nCross-Origin-Opener-Policy:\x20same-origin\r\nCross-Ori
+SF:gin-Resource-Policy:\x20same-origin\r\nDate:\x20Tue,\x2024\x20Nov\x2020
+SF:26\x2008:31:49\x20GMT\r\nEtag:\x20W/\"9e36-1a20c920590\"\r\nLast-Modifi
+SF:ed:\x20Tue,\x2024\x20Nov\x202026\x2008:00:26\x20GMT\r\nOrigin-Agent-Clu
+SF:ster:\x20\?1\r\nReferrer-Policy:\x20no-referrer\r\nStrict-Transport-Sec
+SF:urity:\x20max-age=31536000;\x20includeSubDomains\r\nVary:\x20Accept-Enc
+SF:oding\r\nVia:\x201\.1\x20Caddy\r\nX-Content-Type-Options:\x20nosniff\r\
+SF:nX-Dns-Prefetch-Control:\x20off\r\nX-Download-Options:\x20noopen\r\nX-F
+SF:rame-Options:\x20SAMEORIGIN\r\nX-Permitted-C")%r(HTTPOptions,2C9,"HTTP/
+SF:1\.0\x20404\x20Not\x20Found\r\nContent-Length:\x20143\r\nContent-Securi
+SF:ty-Policy:\x20default-src\x20'none'\r\nContent-Type:\x20text/html;\x20c
+SF:harset=utf-8\r\nCross-Origin-Opener-Policy:\x20same-origin\r\nCross-Ori
+SF:gin-Resource-Policy:\x20same-origin\r\nDate:\x20Tue,\x2024\x20Nov\x2020
+SF:26\x2008:31:49\x20GMT\r\nOrigin-Agent-Cluster:\x20\?1\r\nReferrer-Polic
+SF:y:\x20no-referrer\r\nStrict-Transport-Security:\x20max-age=31536000;\x2
+SF:0includeSubDomains\r\nVia:\x201\.1\x20Caddy\r\nX-Content-Type-Options:\
+SF:x20nosniff\r\nX-Dns-Prefetch-Control:\x20off\r\nX-Download-Options:\x20
+SF:noopen\r\nX-Frame-Options:\x20SAMEORIGIN\r\nX-Permitted-Cross-Domain-Po
+SF:licies:\x20none\r\nX-Xss-Protection:\x200\r\n\r\n<!DOCTYPE\x20html>\n<h
+SF:tml\x20lang=\"en\">\n<head>\n<meta\x20charset=\"utf-8\">\n<title>Error<
+SF:/title>\n</head>\n<body>\n<pre>Cannot\x20OPTIONS\x20/</pre>\n</body>\n<
+SF:/html>\n")%r(RTSPRequest,67,"HTTP/1\.1\x20400\x20Bad\x20Request\r\nCont
+SF:ent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r
+SF:\n400\x20Bad\x20Request");
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Tue Nov 24 08:31:59 2026 -- 1 IP address (1 host up) scanned in 19.71 seconds
