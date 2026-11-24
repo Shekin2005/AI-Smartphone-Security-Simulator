@@ -314,7 +314,8 @@ def _shade_cell(cell, fill):
     tcPr.append(shd)
 
 
-def table(doc, headers, rows, widths=None, size=8.5, first_col_bold=False):
+def table(doc, headers, rows, widths=None, size=8.5, first_col_bold=False,
+          keep_together=False):
     t = doc.add_table(rows=1, cols=len(headers))
     t.style = "Table Grid"
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -352,6 +353,15 @@ def table(doc, headers, rows, widths=None, size=8.5, first_col_bold=False):
     tblHeader = OxmlElement("w:tblHeader")
     tblHeader.set(qn("w:val"), "true")
     trPr.append(tblHeader)
+
+    # Word breaks a table wherever a page ends, even mid-row. Keeping every row
+    # but the last with the next one moves the whole table to the following page
+    # instead, which reads better in a short document.
+    if keep_together:
+        for row in t.rows[:-1]:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    para.paragraph_format.keep_with_next = True
     return t
 
 

@@ -9,8 +9,11 @@ from pathlib import Path
 
 from docx import Document
 
-DOC = Path(__file__).parent / "AI-Smartphone-Security-Simulator-Project-Report.docx"
+# Default to the full edition; pass a path to check the condensed one.
+DOC = (Path(sys.argv[1]) if len(sys.argv) > 1
+       else Path(__file__).parent / "AI-Smartphone-Security-Simulator-Project-Report.docx")
 
+print(f"file       : {DOC.name}")
 doc = Document(str(DOC))
 
 paras = doc.paragraphs
