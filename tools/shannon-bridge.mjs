@@ -294,9 +294,20 @@ function buildScript({ url, workspace, profile }) {
     "-r", shellQuote(wslPath(STAGE)),
     "--models-config", shellQuote(wslPath(MODELS)),
     "-w", shellQuote(workspace),
-    "-o", shellQuote(wslPath(OUT_DIR)),
-    "-f"
+    "-o", shellQuote(wslPath(OUT_DIR))
   ];
+
+  // Hand Shannon the lab's scan credentials and login flow. Without this file
+  // its exploit agents invent their own way in: they register throwaway
+  // accounts that cannot complete MFA enrolment, then retry until the run times
+  // out. Optional - a scan with no config still runs.
+  const config = path.join(REPO, "configs", "shannon-lab.yaml");
+
+  if (existsSync(config)) {
+    flags.push("-c", shellQuote(wslPath(config)));
+  }
+
+  flags.push("-f");
 
   // --pipeline-testing uses minimal prompts: much faster, much shallower. It is
   // the right choice for a demo where the point is that the pipeline runs.

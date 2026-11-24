@@ -119,3 +119,36 @@ CREATE TABLE IF NOT EXISTS tuition_payments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (bank_user_id, request_id)
 );
+
+-- ---------------------------------------------------------------------------
+-- The SQL injection exercise table
+-- ---------------------------------------------------------------------------
+-- /api/lab/exploit/sqli compares a parameterised query against a concatenated
+-- one and reports whether the payload widened the match. That comparison only
+-- means anything if the target has rows: with none, an injected OR matches
+-- nothing and the exercise silently reports "injection had no effect".
+--
+-- This table previously existed only in the running database, seeded for
+-- 'school' alone, so the 'bank' variant always did nothing and a fresh
+-- deployment had no table at all.
+
+CREATE TABLE IF NOT EXISTS lab_sqli_demo (
+  id BIGSERIAL PRIMARY KEY,
+  target TEXT NOT NULL CHECK (target IN ('bank', 'school')),
+  label TEXT NOT NULL,
+  secret TEXT NOT NULL
+);
+
+-- Fixed ids so re-running this file never duplicates the training rows.
+INSERT INTO lab_sqli_demo (id, target, label, secret) VALUES
+  (101, 'school', 'Training student A', 'LAB-GRADE-A'),
+  (102, 'school', 'Training student B', 'LAB-GRADE-B'),
+  (103, 'bank',   'Training account A', 'LAB-BANK-A'),
+  (104, 'bank',   'Training account B', 'LAB-BANK-B')
+ON CONFLICT (id) DO NOTHING;
+
+-- Keep the sequence ahead of the fixed ids so real inserts do not collide.
+SELECT setval(
+  pg_get_serial_sequence('lab_sqli_demo', 'id'),
+  GREATEST((SELECT MAX(id) FROM lab_sqli_demo), 1)
+);

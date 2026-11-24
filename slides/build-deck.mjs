@@ -681,7 +681,7 @@ So the honest conclusion is that the difference is not knowledge, because I gave
     [C("nikto", GREEN, true), C("7,970 requests, 0 errors, 3 findings, ~50 s"), C("container, port 80")],
     [C("Report formats", GREEN, true), C("md 200, json 200, pdf 415"), C("authenticated requests")],
     [C("Auth surface", GREEN, true), C("401 on every tool route without a session"), C("unauthenticated requests")],
-    [C("Rate limiter", AMBER, true), C("30 auth requests / IP / 15 min -> 429"), C("exhausted during testing")],
+    [C("Rate limiter", AMBER, true), C("failed attempts per account -> 429"), C("measured, then redesigned")],
     [C("Route count", GREEN, true), C("40 routes in server.js"), C("source")],
     [C("Database", GREEN, true), C("Postgres 18.3 native, reachable at host.docker.internal:5432"), C("service + query")],
     [C("TLS", GREEN, true), C("Let's Encrypt, valid to 21 Feb 2027, HSTS 1y"), C("certificate chain")],
@@ -738,7 +738,7 @@ The note at the bottom is a mistake I made and fixed. An earlier build accepted 
   const limits = [
     ["Model ceiling", "free models stop at 5-8 decisions; a paid key removes the limit without code changes"],
     ["Shannon runtime", "1-1.5 h for a full scan, against a demo window of minutes"],
-    ["Limiter is in memory", "repeated runs report inconclusive until the app restarts"],
+    ["Limiter keys on account", "per-IP alone throttled every user behind one proxy"],
     ["HTTPS not scannable", "Tailscale terminates TLS; only port 80 is published"],
     ["Probe accounts", "each suite run adds one, so the IDOR count drifts"]
   ];

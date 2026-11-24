@@ -90,11 +90,16 @@ Two protections shape testing:
 1. **TOTP is required.** The secret is stored encrypted with
    `TOTP_ENCRYPTION_KEY` (AES-256-GCM), so the suite decrypts it rather than
    asking for a code.
-2. **A rate limiter allows 30 authentication requests per IP per 15 minutes.**
-   Each suite run spends two. After several runs the limiter returns `429`, and
-   checks that need a login report `inconclusive` — which means *undecided*,
-   never *safe*. `docker restart sim-app` clears it because the counter is in
-   memory.
+2. **A rate limiter counts failed sign-in attempts per account.**
+   Successful logins do not consume budget, and the bucket is keyed on address
+   plus username. The first version had neither property, and that was a real
+   bug with two consequences. A legitimate scan exhausted the budget in minutes:
+   measured in a Shannon run, an exploit agent slept 910 seconds waiting for the
+   window to reset, turning an hour-long scan into a multi-hour one. And because
+   every request arrives through the Caddy container, one client guessing
+   passwords could lock out every other user. Guessing is still bounded by this
+   limiter, the per-account `locked_until` lock, and the MFA attempt counter.
+   `docker restart sim-app` clears the counters, which are held in memory.
 
 ---
 
@@ -535,11 +540,20 @@ The application teaches vulnerabilities, so its own edge matters.
 | Security headers | Helmet: CSP, COOP, CORP, Referrer-Policy, `X-Powered-By` removed |
 | Sessions | PostgreSQL-backed, `HttpOnly` cookie |
 | TOTP secrets | AES-256-GCM at rest with `TOTP_ENCRYPTION_KEY` |
-| Auth rate limit | 30 requests / IP / 15 min |
+| Auth rate limit | failed attempts per account / 15 min |
+| Same-origin guard | rejects a mismatched `Origin`, allows header-less API clients |
 | Command execution | argv allowlist, `shell:false`, target pinned, no privileges |
 | Docker socket | **not** exposed to the app — deliberate |
 | Shannon bridge | loopback + shared token, target allowlist, sanitised source |
 | Secrets in git | `.env*` gitignored; only `.env.stack.example` tracked |
+
+The origin guard rejects a request whose `Origin` is present and does not match
+the host that was addressed. A request with **no** `Origin` header is allowed,
+because browsers always send one and command-line clients do not. Refusing them
+turned every scripted POST into `403 Invalid request origin` — measured, not
+theoretical: a Shannon exploit agent could not sign in and retried for most of
+an hour. CSRF is still covered twice over: a cross-site browser request carries
+a mismatched `Origin`, and the session cookie is `SameSite=strict`.
 
 Deliberately **not** fixed, because they are the lesson: the bank IDOR, the
 mass-assignment registration, and the missing `permissions-policy` header that
@@ -572,6 +586,12 @@ export SHANNON_BRIDGE_TOKEN="$(cat token.txt)"
 export SHANNON_AI_API_KEY="nvapi-..."
 node tools/shannon-bridge.mjs
 ```
+
+Shannon is handed its credentials by `configs/shannon-lab.yaml` and signs in
+through `/lab-login.html`, a plain form that calls the same `/api/auth/login`
+and `/api/auth/verify` endpoints the phone UI does. Both exist so an automated
+engine does not have to drive the phone shell — power button, PIN pad, app tile
+— before it can test an API. The bridge passes the config with `-c`.
 
 Full command reference: `TERMINAL-COMMANDS.md`.
 Shannon feasibility and measurements: `SHANNON.md`.

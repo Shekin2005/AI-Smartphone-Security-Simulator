@@ -1,0 +1,62 @@
+# ==================================================
+# SHANNON SCAN CONFIGURATION - AI Smartphone Security Simulator
+# ==================================================
+# Without this file Shannon's exploit agents had to invent their own way in:
+# they registered throwaway accounts, could not complete MFA enrolment, and
+# `authz-exploit` spent most of an hour sleeping on 429s. Measured on
+# 2026-11-24: the agent's own log line was "Rate limiting on /api/auth prevents
+# obtaining MFA-verified session".
+#
+# With the file, Shannon is told the account, the password and the TOTP secret
+# up front, exactly as a real engagement hands over test credentials. The
+# `scan-bank` account is provisioned and already MFA-enrolled, so the login is
+# one page and three fields.
+#
+# Credentials here are lab credentials and are rotated after submission.
+
+description: >
+  Node/Express security lab published at https://shekin.tail97139a.ts.net.
+  Two deliberately vulnerable apps behind one phone UI: Royal Banking
+  (role bank_user) and Acadia Student (role student). Application source is
+  server.js plus school-routes.js and school-services-routes.js. The provisioned
+  scan account is scan-bank, already MFA-enrolled.
+
+authentication:
+  login_type: form
+  login_url: "https://shekin.tail97139a.ts.net/lab-login.html?app=bank"
+
+  credentials:
+    username: "scan-bank"
+    password: "ScanLab!2026pass"
+    totp_secret: "OFLS6MD3GNEVKNRSHEYEW6DYLVIWSXRI"
+
+  # /lab-login.html is a plain form that calls the same /api/auth/login and
+  # /api/auth/verify endpoints the phone UI uses. It exists so a scanner does
+  # not have to drive the phone shell (power button, PIN pad, app tile) first.
+  login_flow:
+    - "Type $username into the input labelled Username"
+    - "Type $password into the input labelled Password"
+    - "Type $totp into the input labelled Authenticator code"
+    - "Click the button labelled Sign in"
+    - "Wait until the text 'Signed in as' appears"
+
+  # The page appends #signed-in only after /api/auth/me confirms the session.
+  success_condition:
+    type: element_present
+    value: "#signed-in"
+
+rules_of_engagement: >
+  Authorised lab environment, owned by the tester. Test only
+  https://shekin.tail97139a.ts.net. The scan account is a bank_user; the Acadia
+  app has its own student accounts. Everything under /api is in scope. Do not
+  delete accounts and do not change the scan account's password.
+
+rules:
+  avoid:
+    - description: "Do not sign out - it invalidates the shared scan session"
+      type: url_path
+      value: "/api/auth/logout"
+  focus:
+    - description: "Banking and tuition APIs carry the lab's IDOR"
+      type: url_path
+      value: "/api/bank"

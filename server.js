@@ -12,7 +12,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
-import { rateLimit } from "express-rate-limit";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import {
   randomBytes,
   createCipheriv,
@@ -138,6 +138,17 @@ app.use("/api", (req, res, next) => {
 
   const origin = req.get("origin");
 
+  // No Origin header means the request did not come from a browser page:
+  // fetch, XHR and form posts all send one, while curl and the scan engines do
+  // not. Rejecting those broke every scripted POST with "Invalid request
+  // origin" - measured in the Shannon run, `authz-exploit` could not log in and
+  // retried for most of an hour. The CSRF guarantee is unchanged: a cross-site
+  // browser request does carry a mismatched Origin, and the session cookie is
+  // SameSite=strict, so a forged request would not carry a session anyway.
+  if (!origin) {
+    return next();
+  }
+
   const allowedHosts = new Set();
 
   for (const candidate of [
@@ -182,11 +193,31 @@ app.use("/api", (req, res, next) => {
 // 6. AUTHENTICATION RATE LIMITING
 // ==================================================
 
+// Two properties matter here, and the first version had neither.
+//
+// 1. Only *failed* attempts count. A successful sign-in is not an attack, and
+//    the pentest engines re-authenticate constantly. Counting successes meant a
+//    legitimate scan exhausted the budget in minutes; measured in a Shannon run,
+//    `authz-exploit` slept 910 seconds waiting for the window to reset, which
+//    turned an hour-long scan into a multi-hour one.
+//
+// 2. The bucket is per account, not per address. Every request arrives through
+//    the Caddy container, so a per-IP key put the whole deployment in one
+//    bucket: one client guessing passwords would lock out every other user, and
+//    a scanner and a demo could starve each other. Keying on IP + username keeps
+//    brute-force bounded per account without a global choke point.
+//
+// Guessing is still bounded three ways: this limiter, the per-account
+// `locked_until` lock, and the MFA attempt counter. The RateLimit headers are
+// still emitted, which is what the deterministic `auth-ratelimit` check reads.
 app.use("/api/auth", rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 30,
+  skipSuccessfulRequests: true,
   standardHeaders: "draft-7",
-  legacyHeaders: false
+  legacyHeaders: false,
+  keyGenerator: req =>
+    `${ipKeyGenerator(req.ip)}|${String(req.body?.username ?? "").toLowerCase()}`
 }));
 
 // ==================================================
@@ -2201,8 +2232,22 @@ app.get("/api/shannon/report", async (req, res) => {
   }
 
   if (!upstream.ok) {
+    // The bridge answers with JSON, so pass it through as an object rather than
+    // nesting it as a quoted string. A caller reading detail.files should not
+    // have to parse JSON twice.
     const text = await upstream.text();
-    return res.status(upstream.status).json({ error: "No Shannon report yet", detail: text });
+    let detail;
+
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      detail = { raw: text.slice(0, 300) };
+    }
+
+    return res.status(upstream.status).json({
+      error: "No Shannon report yet",
+      detail
+    });
   }
 
   const contentType = upstream.headers.get("content-type") || "text/markdown; charset=utf-8";
