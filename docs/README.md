@@ -5,7 +5,7 @@ All three editions describe the same assessment, from the same recorded run of
 
 | File | Pages | Use it for |
 | --- | --- | --- |
-| `AI-Smartphone-Security-Simulator-Full-Report.docx` | **22** | The primary submission. Adds the industry-evidence chapter (§3) — Big Sleep, MDASH, Anthropic, XBOW, DARPA AIxCC, the ARTEMIS head-to-head, Semgrep's evaluation and the Omdia survey — plus a dedicated AI-vs-manual chapter (§7) and an AI tooling/cost appendix. 15 references. |
+| `AI-Smartphone-Security-Simulator-Full-Report.docx` | **22** | The primary submission. Adds the industry-evidence chapter (§3) — Big Sleep, MDASH, Anthropic, XBOW, DARPA AIxCC, the ARTEMIS head-to-head, Semgrep's evaluation and the Omdia survey — plus a dedicated AI-vs-manual chapter (§7) and an AI tooling/cost appendix. 16 references. |
 | `AI-Smartphone-Security-Simulator-Report-Short.docx` | 9 | Submission where a strict page limit applies. Every finding, the engine comparison, 38 references. |
 | `AI-Smartphone-Security-Simulator-Project-Report.docx` | 32 | The earlier reference edition (pre-industry-evidence). Superseded by the full report; kept for its standalone source-code walkthrough. |
 
@@ -45,7 +45,7 @@ The documents are generated, so text corrections do not require touching the
 layout:
 
 ```bash
-python docs/build-project-docx-full.py      # 22-page primary edition (15 refs)
+python docs/build-project-docx-full.py      # 22-page primary edition (16 refs)
 python docs/build-project-docx-short.py     # 9-page edition (38 refs)
 python docs/build-project-docx.py           # 32-page legacy reference edition
 python docs/verify-docx.py docs/AI-Smartphone-Security-Simulator-Full-Report.docx
@@ -61,7 +61,7 @@ page, since nine pages does not need one.
 ## Changing the citation style
 
 References are numbered (IEEE-style) and the numbering is generated from the
-reference list — `REFS15` in `references_v2.py`, seven core standards and eight
+reference list — `REFS15` in `references_v2.py`, seven core standards and nine
 industry sources — so an in-text citation cannot drift out of step with the
 list. Every other key used in the body resolves through the `ALIAS` table in
 the build script, which maps a dropped source to the nearest retained one; where
@@ -76,9 +76,26 @@ Section 3 is the industry-evidence chapter: what AI security testing has
 achieved in production (Google Big Sleep's SQLite 0-day, Microsoft MDASH's 16
 Windows vulnerabilities via 100+ debating agents, Anthropic's 500+ validated
 high-severity findings, XBOW's #1 HackerOne finish and 28-minutes-vs-40-hours
-benchmark, DARPA AIxCC's 54/70 found and 43 patched), the head-to-head
+benchmark, DARPA AIxCC's 54 of 63 found and 43 patched), the head-to-head
 measurements (ARTEMIS at ICLR 2026 and Semgrep's evaluation), and the Omdia
 adoption and buyer study — each with the method stated. Section 7 then reads the
 lab's own AI-vs-manual result against that evidence. Appendix B inventories
 every AI resource used with its cost, including the four failed runs and why
 each failed.
+
+## Setup and structure guide
+
+`SETUP-AND-STRUCTURE.md` (11 pages, with `.docx` and `.pdf`) is a separate
+document from the report editions above. It covers how the code is arranged and
+how to stand the whole thing up on a different computer: what the working folder
+actually contains and what to delete before moving it, the repository file map,
+the three deployment paths, database creation and schema application, the
+environment variables with the failure each one causes when wrong, account
+provisioning, the pentest engines, secret hygiene and a troubleshooting table
+built from errors actually hit during the build.
+
+Two facts in it matter more than the rest. The schema is never applied
+automatically and `schema.sql` is not inside the Docker image, so a fresh
+database stays empty until you run it by hand from the host. And
+`tools/ai-agent.mjs` carries a fallback API key in source, which must be revoked
+and replaced before the repository is shared or published.
