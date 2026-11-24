@@ -223,7 +223,6 @@ A note on the two-count measurement is necessary because it is the report's main
 Four controls were used. **Negative controls**: every positive result was paired with a request that should fail. The Acadia enrolment endpoint binds its query to the session user; tested with the same identifier used against the bank endpoint, it returned only the caller's own enrolments. Without that control, a 200 from the bank endpoint could be explained by the record being public. **Provider independence**: the agent and the pipeline used different providers, so a single outage could not explain both results. **Preserved failure**: failed runs were archived with their logs rather than discarded. **Re-execution**: the host rebooted mid-assessment; the suite was re-run and reproduced its result, and findings were re-verified with a fresh session.
 
 ::: figure fig1_design.png | Figure 1. Research design: four engines are measured against a known defect list with identical credentials, then interpreted against published industry evidence.
-:::
 
 ## 5.6 Ethical considerations
 
@@ -508,7 +507,7 @@ The pipeline ran for approximately 42 minutes across six phases — pre-reconnai
 
 The artefacts it did produce are more informative than a completed report would have been, because they show where the pipeline's judgement succeeded and where its plumbing failed. Its analysis reached all three ground-truth defects. The authorisation analysis queued the tuition endpoint as a candidate horizontal-privilege issue; the authentication analysis described the lockout behaviour; the injection analysis identified the concatenated query and recorded it as requiring validation with an authenticated session. Two further candidates concerned money movement in the fictitious bank and were not confirmed as vulnerabilities, since moving money between one's own accounts is the application's purpose rather than a flaw.
 
-::: figure fig3_funnel.png | Figure 3. The pipeline's detection funnel. Its analysis reached every ground-truth defect; the failure was in execution and reporting, not in comprehension.
+::: figure fig3_funnel.png | Figure 2. The pipeline's detection funnel. Its analysis reached every ground-truth defect; the failure was in execution and reporting, not in comprehension.
 
 The pipeline's blocking point was the harness, not the target. Its error log records that exploitation of the injection finding was blocked because the authentication rate limiter prevented it from obtaining an MFA-verified session. That blocker was a defect in the rate limiter's keying, repaired after the run; the endpoint itself had been reachable throughout. The distinction matters for the comparison: the pipeline understood the vulnerability and was prevented from proving it by a fault in the infrastructure it was testing through.
 
@@ -526,7 +525,7 @@ Table 10 assembles the scored comparison. The two counts are reported separately
 | Human interventions during run | Not applicable | 0 | 0 | 2 |
 | Completion | Complete | Complete | Complete | Aborted |
 
-::: figure fig2_recall.png | Figure 2. Ground-truth findings reported against findings the engine's own traffic demonstrated. The amber column is the measure a single-number report would conceal.
+::: figure fig2_recall.png | Figure 3. Ground-truth findings reported against findings the engine's own traffic demonstrated. The amber column is the measure a single-number report would conceal.
 
 Three observations follow. First, recall on this target was a property of the *approach*, not of the model: the two engines with a deterministic predicate achieved complete recall, and the two without one achieved none. Second, the pipeline's detected count equals the suite's reported count, which means the information was available to it and was lost between detection and reporting. Third, precision is undefined rather than perfect for the AI engines: an engine that reports nothing has no false positives and no true positives, and scoring it as 100 per cent precise would reward silence.
 
