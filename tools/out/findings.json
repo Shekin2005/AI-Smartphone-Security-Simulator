@@ -1,6 +1,6 @@
 {
   "target": "https://shekin.tail97139a.ts.net",
-  "generated_at": "2026-11-24T06:34:33.027Z",
+  "generated_at": "2026-11-24T15:42:00.929Z",
   "results": [
     {
       "id": "headers",
@@ -149,23 +149,23 @@
       "category": "Broken object level authorization (BOLA/IDOR)",
       "cwe": "CWE-639",
       "vulnerable": true,
-      "summary": "12 student record(s) - names and outstanding tuition - were disclosed to a bank account with no relationship to them.",
+      "summary": "15 student record(s) - names and outstanding tuition - were disclosed to a bank account with no relationship to them.",
       "evidence": [
         {
           "request": "GET /api/bank/tuition/student/AC00000001..AC00000090 (bank session, 4 at a time)",
-          "response": "12 student record(s) disclosed"
+          "response": "15 student record(s) disclosed"
         },
         {
-          "request": "GET /api/bank/tuition/student/AC00000034",
-          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000034\",\"name\":\"0306446\",\"tuitionCents\":200000}}"
+          "request": "GET /api/bank/tuition/student/AC00000036",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000036\",\"name\":\"jass\",\"tuitionCents\":125000}}"
         },
         {
           "request": "GET /api/bank/tuition/student/AC00000035",
           "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000035\",\"name\":\"shekin\",\"tuitionCents\":125000}}"
         },
         {
-          "request": "GET /api/bank/tuition/student/AC00000036",
-          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000036\",\"name\":\"jass\",\"tuitionCents\":125000}}"
+          "request": "GET /api/bank/tuition/student/AC00000034",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000034\",\"name\":\"0306446\",\"tuitionCents\":200000}}"
         },
         {
           "request": "GET /api/bank/tuition/student/AC00000048",
@@ -184,12 +184,12 @@
           "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000074\",\"name\":\"pentest_probe_mwtt44m1\",\"tuitionCents\":125000}}"
         },
         {
-          "request": "GET /api/bank/tuition/student/AC00000075",
-          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000075\",\"name\":\"pentest_probe_mwtx5utd\",\"tuitionCents\":125000}}"
+          "request": "GET /api/bank/tuition/student/AC00000076",
+          "response": "HTTP 200 {\"student\":{\"studentId\":\"AC00000076\",\"name\":\"pentest_probe_mwtxcb4t\",\"tuitionCents\":125000}}"
         },
         {
           "request": "(truncated)",
-          "response": "4 further student record(s) also disclosed"
+          "response": "7 further student record(s) also disclosed"
         }
       ],
       "remediation": "The lookup must be scoped to students the caller has a legitimate relationship with. Instead of a bare sequential ID, require a payer/student link (for example a row in a payments or tuition-link table for req.session.userId) and return 404 when no link exists. Replace the sequential AC######## identifier with an unguessable reference, and rate-limit enumeration."
