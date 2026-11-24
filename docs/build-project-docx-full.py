@@ -49,7 +49,7 @@ ALIAS = {
     "google_ciso": "pz_bigsleep", "secweek_sqlite": "pz_bigsleep",
     "ms_learn": "ms_mdash", "cso_ms": "ms_mdash", "secweek_ms": "ms_mdash",
     "github_oss": "ms_mdash", "openai_aardvark": "ms_mdash",
-    "anthropic_disc": "anthropic_0day", "anthropic_mythos": "anthropic_0day",
+    "anthropic_mythos": "anthropic_0day",
     "anthropic_ccs": "anthropic_0day", "xbow_1060": "xbow_top1",
     "aixcc_sok": "darpa_results", "kaist": "darpa_results",
     "h3_trad": "artemis", "h3_prior": "artemis", "h3_jerome": "artemis",
@@ -548,19 +548,21 @@ tbl(["Organisation", "System", "Target", "Measured result", "Method, stated"],
       "attack chains for Chrome V8 RCE and sandbox escape; local privilege escalation on OpenBSD, "
       "FreeBSD and Linux.",
       f"Parallel scanning agents with coverage tracking; memory-safety bugs verified with Address "
-      f"Sanitizer, and a self-critique stage to filter false positives {c('anthropic_0day')}"],
+      f"Sanitizer, and a self-critique stage to filter false positives "
+      f"{c('anthropic_0day', 'anthropic_disc')}"],
      ["XBOW",
       "Autonomous pentester",
       "Live production bug-bounty programmes on HackerOne; 104 web-security benchmarks",
-      "First autonomous system to reach #1 on HackerOne's US leaderboard (June 2025). Its own "
-      "account reports matching a principal pentester's 40-hour assessment in 28 minutes on the "
-      "benchmark set, and breaking an AES-128-CBC padding oracle in 17.5 minutes.",
+      "First autonomous system to reach #1 on HackerOne's US leaderboard (June 2025). On 104 "
+      "original web-security benchmarks it scored 85%, exactly matching the principal pentester's "
+      "85% but in 28 minutes against that pentester's 40 hours; the five human testers combined "
+      "reached 87.5%.",
       f"Fully autonomous exploitation against in-scope production targets, with human triage "
       f"upstream at the platform {c('xbow_top1')}"],
      ["DARPA / ARPA-H",
       "AIxCC finalist cyber reasoning systems",
-      "54 million lines of real critical-infrastructure code, 70 injected vulnerabilities",
-      "Teams found 54 of 70 synthetic vulnerabilities and patched 43; 86% of scored synthetic "
+      "54 million lines of real critical-infrastructure code, 63 injected vulnerabilities",
+      "Teams found 54 of 63 synthetic vulnerabilities and patched 43; 86% of scored synthetic "
       "vulnerabilities identified (up from 37% at the semifinal) and 68% of those patched (up from "
       "25%); 18 real, previously unknown vulnerabilities found, 11 patches supplied. Team Atlanta won "
       "with 392.76 points.",
@@ -686,7 +688,7 @@ tbl(["Task", "Better performer", "Evidence"],
      ["GUI-based and multi-step interactive tasks", "Human",
       f"Agents explicitly reported as struggling with GUI tasks {c('artemis')}"]],
     widths=[5.2, 3.4, 7.4])
-caption(doc, "Table 5. Current division of labour. The AI advantage is concentrated in breadth, speed "
+caption(doc, "Table 4. Current division of labour. The AI advantage is concentrated in breadth, speed "
              "and code review; the human advantage in judgement and verification.")
 
 p("The single most important qualifier on the AI column is that every strong result came from a system "
@@ -739,7 +741,7 @@ tbl(["Layer", "Component", "Version", "Exposure"],
      ["Data", "PostgreSQL", "18.3", "Host 5432"],
      ["Orchestration", "Temporal (`shannon-temporal`)", "1.7.0", "Internal"]],
     widths=[2.8, 6.4, 3.4, 3.0])
-caption(doc, "Table 6. Deployment layers. The application publishes no port directly; all inbound "
+caption(doc, "Table 5. Deployment layers. The application publishes no port directly; all inbound "
              "traffic traverses Caddy.")
 
 p("Two consequences shaped the assessment. Because every request arrives from the Caddy container, the "
@@ -764,7 +766,7 @@ tbl(["File", "Lines", "Bytes", "Role"],
      ["`tools/ai-agent.mjs`", "885", "29,986", "In-container LLM agent and harness"],
      ["`tools/shannon-bridge.mjs`", "674", "20,436", "Bridge between the app and Shannon"]],
     widths=[5.2, 2.0, 2.2, 6.6])
-caption(doc, "Table 7. Source inventory. The container image was verified to contain the same "
+caption(doc, "Table 6. Source inventory. The container image was verified to contain the same "
              "82,801-byte `server.js`; an earlier build had silently copied a 73,728-byte truncated "
              "copy and crash-looped.")
 
@@ -812,6 +814,20 @@ p("The manual approach in this study means source review by the author, augmente
   "across the build of the lab, and every automated finding was ultimately confirmed by a manual "
   "request.")
 
+p("Two conventional tools were run against the same deployment, because a comparison that omitted "
+  "them would overstate what either the suite or the agents contribute. Nmap enumerated the network "
+  "surface and found four ports: 80 open, 443 closed, 3000 closed and 5432 open — a PostgreSQL "
+  "listener published to the host network, which is a finding about exposure rather than about the "
+  "application. Nikto exercised the HTTP surface with 7,970 requests, completed with zero errors, "
+  "and returned three items: the Caddy server banner, an `origin-agent-cluster` response header, and "
+  "the absence of a `Permissions-Policy` header.")
+
+p("None of those three is a vulnerability, and that is the informative result. Both tools "
+  "characterise configuration; neither can see an authorisation decision, because authorisation is a "
+  "property of what the application does with an identifier after authentication, not of how it "
+  "answers a malformed request. The defects in Section 6 are invisible to a scanner by construction — "
+  "the same limitation that Section 7 identifies in the agents, arriving from a different direction.")
+
 h2("5.3 The deterministic suite")
 
 p("`tools/pentest-suite.mjs` is a dependency-free Node script of 1,286 lines implementing twelve "
@@ -829,7 +845,7 @@ tbl(["#", "Check", "Establishes"],
      ["9–10", "Session rotation; registration role control", "Identifier changes; no privilege escalation"],
      ["11–12", "Authentication rate limiting; HTTPS enforcement", "Throttled; plain HTTP redirected"]],
     widths=[1.4, 5.6, 8.6])
-caption(doc, "Table 8. The twelve deterministic checks, grouped. Checks 6, 7 and 12 returned "
+caption(doc, "Table 7. The twelve deterministic checks, grouped. Checks 6, 7 and 12 returned "
              "vulnerable on the recorded run.")
 
 p("Checks 4, 5 and 6 form a deliberate triad: 4 and 5 are vertical and cross-tenant controls that "
@@ -879,7 +895,7 @@ tbl(["Metric", "Definition", "Why it is reported"],
      ["Human interventions", "Manual steps needed to keep the run alive", "Measures real autonomy"],
      ["Cost", "Provider spend for the run", "Separates capability from affordability"]],
     widths=[3.4, 6.2, 5.6])
-caption(doc, "Table 9. Scoring metrics. Human interventions and cost were added after the first run, "
+caption(doc, "Table 8. Scoring metrics. Human interventions and cost were added after the first run, "
              "because both proved decisive.")
 
 h2("5.7 Controls against measurement error")
@@ -910,7 +926,7 @@ tbl(["ID", "Finding", "Severity", "Score", "Basis"],
      ["F-04", "Plain HTTP served without redirect to HTTPS", "Low", "3.1", "Runtime, suite check"],
      ["F-05", "Authentication responses lacked `Cache-Control`", "Low", "3.1", "Source, remediated"]],
     widths=[1.3, 7.8, 1.9, 1.2, 4.4])
-caption(doc, "Table 10. Confirmed findings with CVSS 3.1 base scores. Both 6.5 findings sit in the "
+caption(doc, "Table 9. Confirmed findings with CVSS 3.1 base scores. Both 6.5 findings sit in the "
              "Medium band (4.0–6.9).")
 
 p("CVSS measures the severity of a technical weakness, not its importance to the organisation. F-01 "
@@ -1042,7 +1058,7 @@ tbl(["Control tested", "Result", "Mechanism"],
      ["Session fixation / cookie flags", "Defeated / correct", "`regenerate()`; HttpOnly, SameSite, Secure"],
      ["Login enumeration / registration escalation", "Resisted / blocked", "Uniform error; server-side role check"]],
     widths=[6.4, 3.4, 5.4])
-caption(doc, "Table 11. Controls tested and confirmed with live requests, not assumed.")
+caption(doc, "Table 10. Controls tested and confirmed with live requests, not assumed.")
 
 p("The pattern is informative. The application's injection defences are uniformly sound, while its "
   "authorisation defences fail in exactly one place. That is the opposite of what one might expect "
@@ -1058,7 +1074,7 @@ h1("7. AI versus Manual Testing on This Target")
 
 h2("7.1 The measured result")
 
-tbl(["", "Manual review", "Deterministic suite", "LLM agent", "Multi-agent pipeline"],
+tbl(["Measure", "Manual review", "Deterministic suite", "LLM agent", "Multi-agent pipeline"],
     [["Wall-clock", "Several hours", "41 s", "3 s", "42 min (aborted)"],
      ["Ground truth reported", "3 of 3", "3 of 3", "0 of 3", "0 of 3"],
      ["Detected but unreported", "—", "0", "1", "2 (in analysis files)"],
@@ -1067,7 +1083,7 @@ tbl(["", "Manual review", "Deterministic suite", "LLM agent", "Multi-agent pipel
      ["Human interventions", "n/a", "0", "0", "2 (credential repair, restart)"],
      ["Cost", "Excluded (author's time)", "£0", "≈£0.01", "≈£0.06 in failed runs"]],
     widths=[3.4, 2.6, 2.8, 2.6, 3.4])
-caption(doc, "Table 12. Measured comparison on the same target, same credentials, same ground truth.")
+caption(doc, "Table 11. Measured comparison on the same target, same credentials, same ground truth.")
 
 p("On this target the manual and deterministic approaches won decisively, and the honest question is "
   "why. Three explanations were tested and two were rejected.")
@@ -1186,7 +1202,7 @@ tbl(["Defect", "Observed effect", "Fix"],
       "`?format=pdf` appeared to succeed while serving Markdown",
       "`md` and `json` served; anything else `415`"]],
     widths=[4.4, 6.4, 4.6])
-caption(doc, "Table 13. Harness defects and repairs, each verified fixed with a live request.")
+caption(doc, "Table 12. Harness defects and repairs, each verified fixed with a live request.")
 
 p(f"The first is the most consequential. Requests without an `Origin` header are not a CSRF risk — a "
   f"browser always sends `Origin` on a cross-origin state-changing request, and `SameSite=strict` "
@@ -1329,7 +1345,7 @@ p("**Second, the industry evidence shows AI performing better than human testers
   f"network {c('artemis')}; a harness of a hundred agents found sixteen Windows vulnerabilities "
   f"including four critical RCEs with zero false positives on planted bugs {c('ms_mdash')}; an "
   f"autonomous tester matched a principal pentester's 40 hours in 28 minutes and reached first place "
-  f"on HackerOne's US leaderboard {c('xbow_top1')}; and DARPA's finalists found 54 of 70 "
+  f"on HackerOne's US leaderboard {c('xbow_top1')}; and DARPA's finalists found 54 of 63 "
   f"injected vulnerabilities and 18 real zero-days in fully autonomous operation {c('darpa_results')}. "
   f"Every one of those systems carries an oracle, a validation loop and scale. The models are "
   f"necessary but not sufficient.")
@@ -1406,7 +1422,7 @@ page_break(doc)
 
 h1("Appendix A. Source Code Information")
 
-p("Line numbers refer to the committed files listed in Table 7. Finding-to-line mapping is given so a "
+p("Line numbers refer to the committed files listed in Table 6. Finding-to-line mapping is given so a "
   "reviewer can go directly from a finding to the code.")
 
 tbl(["File", "Responsibility", "Security-relevant contents"],
@@ -1520,12 +1536,12 @@ code("# Sign in and complete MFA, then confirm F-01 by hand\n"
 h1("Appendix D. Evidence Inventory")
 
 tbl(["Path", "Contents", "Supports"],
-    [["`tools/out/PENTEST-REPORT.md`", "Suite report with request and response per check", "Tables 8, 11, 12"],
-     ["`tools/out/findings.json`", "Machine-readable results", "Table 12"],
+    [["`tools/out/PENTEST-REPORT.md`", "Suite report with request and response per check", "Tables 7, 10, 11"],
+     ["`tools/out/findings.json`", "Machine-readable results", "Table 11"],
      ["`tools/out/AI-AGENT-REPORT.md`", "Agent transcript, claimed and detected counts", "Listing 6"],
-     ["`tools/out/COMPARISON-REPORT.md`", "Engines scored against ground truth", "Table 12"],
-     ["`tools/out/NMAP-REPORT.txt` / `.xml`", "Port and service scan", "Section 4.1"],
-     ["`tools/out/NIKTO-REPORT.txt`, `NIKTO-CONSOLE.txt`", "7,970 requests, 0 errors, 3 findings", "Section 3.6"],
+     ["`tools/out/COMPARISON-REPORT.md`", "Engines scored against ground truth", "Table 11"],
+     ["`tools/out/NMAP-REPORT.txt` / `.xml`", "Port and service scan", "Section 5.2"],
+     ["`tools/out/NIKTO-REPORT.txt`, `NIKTO-CONSOLE.txt`", "7,970 requests, 0 errors, 3 findings", "Section 5.2"],
      ["`tools/out/shannon/run-42min/`", "Six analyses, four queues, `error.log`", "Section 7.4"],
      ["`tools/out/shannon/partial-run1/`", "Earlier exploitation evidence, incl. SH-06", "Section 7.4"],
      ["`tools/out/shannon/SHANNON-CONSOLIDATED-REPORT.md`", "Reconstruction of the report never produced", "Section 7.4"],

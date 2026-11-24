@@ -191,7 +191,7 @@ function table(s, rows, { x, y, w, colW, rowH = 0.3 }) {
     ["12", "deterministic\nchecks in 41 s", CYAN],
     ["3 / 5", "ground-truth\nfindings", AMBER],
     ["0 of 3", "reported by the\nAI agent", RED],
-    ["22", "page academic\nreport, 15 refs", GREEN]
+    ["22", "page academic\nreport, 16 refs", GREEN]
   ];
 
   stats.forEach(([v, c, col], i) => {
@@ -725,11 +725,11 @@ Everything cross-references through REPORT-INDEX.md.`);
 // =========================================================================
 
 {
-  const s = slide("The academic report", "22 pages, 11,881 words, 19 tables, 15 references");
+  const s = slide("The academic report", "22 pages, 11,941 words, 18 tables, 16 references");
 
   // Stats strip
   const stats = [
-    ["22", "pages"], ["11,881", "words"], ["19", "tables"], ["15", "refs"]
+    ["22", "pages"], ["11,941", "words"], ["18", "tables"], ["16", "refs"]
   ];
   stats.forEach(([v, c], i) => {
     const x = 0.45 + i * 1.12;
@@ -760,7 +760,7 @@ Everything cross-references through REPORT-INDEX.md.`);
     "8  Defects in the harness\n" +
     "9  Discussion and threats to validity\n" +
     "10  Conclusions and future work\n" +
-    "     References - 15 sources",
+    "     References - 16 sources",
     5.0, 2.66, 4.5, 1.2, 8);
 
   // Left: what makes it defensible
@@ -790,7 +790,7 @@ Everything cross-references through REPORT-INDEX.md.`);
 
   notes(s, `Finally the written report - and this is what carries the marks if the presentation is short.
 
-22 pages, about 11,900 words. Nineteen tables, and 15 references. I deliberately cut it down from 71 references, because a list that long makes the argument harder to follow rather than stronger. Fifteen is enough to carry every claim.
+22 pages, about 11,900 words. Eighteen tables, and 16 references. I deliberately cut it down from 71 references, because a list that long makes the argument harder to follow rather than stronger. Sixteen is enough to carry every claim, and I checked every one against the live source before submitting.
 
 Two chapters matter most.
 

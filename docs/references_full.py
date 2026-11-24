@@ -25,7 +25,9 @@ EXTRA = [
                        "fuzzing missed'. Available at: https://www.securityweek.com/"
                        "google-says-its-ai-found-sqlite-vulnerability-that-fuzzing-missed "
                        "(Accessed: 24 November 2026)."),
-    ("xbow_top1", "XBOW (2025) 'The road to top 1: how XBOW did it'. Available at: "
+    ("xbow_top1", "XBOW (2024–2025) 'XBOW now matches the capabilities of a top human "
+                  "pentester' and 'The road to top 1: how XBOW did it'. Available at: "
+                  "https://xbow.com/blog/xbow-vs-humans and "
                   "https://xbow.com/blog/top-1-how-xbow-did-it (Accessed: 24 November 2026)."),
     ("xbow_1060", "XBOW (2026) 'We ran 1,060 autonomous attacks: what we learned'. Available at: "
                   "https://xbow.com/blog/we-ran-1060-autonomous-attacks "
@@ -81,9 +83,11 @@ EXTRA = [
     ("cvebench", "Fang, R. et al. (2025) 'CVE-Bench: a benchmark for AI agents' ability to exploit "
                  "real-world web application vulnerabilities', *arXiv preprint* "
                  "arXiv:2503.17332."),
-    ("artemis", "Singer, A. et al. (2026) 'Comparing AI agents to cybersecurity professionals in "
-                "real-world penetration testing', *Proceedings of the International Conference on "
-                "Learning Representations (ICLR 2026)*. Preprint: *arXiv* arXiv:2512.09882."),
+    ("artemis", "Lin, J.W., Jones, E.K., Jasper, D.J., Ho, E.J., Wu, A., Yang, A.T., Perry, N., "
+                "Zou, A., Fredrikson, M., Kolter, J.Z., Liang, P., Boneh, D. and Ho, D.E. (2026) "
+                "'Comparing AI agents to cybersecurity professionals in real-world penetration "
+                "testing', *Proceedings of the International Conference on Learning Representations "
+                "(ICLR 2026)*. Preprint: *arXiv* arXiv:2512.09882."),
     ("omdia", "Omdia (2026) *The 2026 State of Agentic AI in Pentesting*. Commissioned by Synack. "
               "Survey of 200 US security leaders, fielded 11–22 December 2025."),
     ("synack_buyers", "Synack (2026) 'What enterprise buyers want from AI pentesting, according to "

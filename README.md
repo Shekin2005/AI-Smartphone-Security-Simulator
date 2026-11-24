@@ -48,15 +48,29 @@ imperfect — that is what the pentest tooling exists to find.
               PostgreSQL
 ```
 
-Two containers. The pentest tooling runs **inside** the app container, so there
+Three containers. The pentest tooling runs **inside** the app container, so there
 is no scanner service, no Docker socket, and no second network surface. Only
-Caddy publishes a port.
+Caddy publishes a port; the database is reachable only on the internal network.
 
 ---
 
-## Quick start
+## Setup on a new machine
 
-Requires Docker only. No configuration file, no manual database, no SQL:
+Everything needed is in this repository. A fresh clone starts with **one
+command**: no `.env` to write, no database to create, no SQL to run by hand.
+
+### 1. What you need
+
+| Requirement | Notes |
+| --- | --- |
+| Docker Desktop (Windows, macOS) or Docker Engine + Compose v2 (Linux) | `docker --version` and `docker compose version` should both work |
+| Git | To clone |
+| Node.js 20+ | **Optional.** Only needed to run the scanners from a terminal instead of the UI |
+
+Port 80 must be free. If something already uses it, see
+[Changing the port](#5-changing-the-port-or-the-address).
+
+### 2. Start it
 
 ```bash
 git clone https://github.com/Shekin2005/AI-Smartphone-Security-Simulator.git
@@ -64,51 +78,227 @@ cd AI-Smartphone-Security-Simulator
 docker compose up -d --build
 ```
 
-Then open <http://localhost> and unlock the phone with `1234`.
+The first build takes roughly three to five minutes: it compiles the native
+`argon2` module and installs `nmap`, `nikto` and `whatweb` into the app image.
+Later starts take seconds.
 
-On first start the app waits for PostgreSQL, applies `schema.sql`, and seeds
-three accounts, printing their TOTP secrets once into the log
-(`docker compose logs app`):
+Then open **<http://localhost>**, press the power button, and unlock the phone
+with passcode `1234`.
 
-| Account | App | Username | Password | Role |
-| --- | --- | --- | --- | --- |
-| Bank scan account | bank | `scan-bank` | `ScanLab!2026pass` | bank_user |
-| School scan account | acadia | `scan-student` | `ScanLab!2026pass` | student |
-| School administrator | acadia | `professor` | `Acadia-Admin-2026!` | admin |
+### 3. What happens on the first start
 
-The TOTP secrets are fixed and documented, not random, so the pentest tools
-work immediately: `OFLS6MD3GNEVKNRSHEYEW6DYLVIWSXRI` (bank),
-`NAWFGQ2TKBTW2PSUJVDSCKLTH5KG4ZLC` (school),
-`IYZUKTCLOFJCKQKVLVLHEQC3PFDWKMDQ` (administrator). Generate a current code
-with `node tools/totp-code.mjs <SECRET>`.
+Nothing is hidden behind manual steps, so this is the full sequence:
 
-To use your own database, secrets or hostname instead, copy
-`.env.stack.example` to `.env.stack`, edit it, and pass it with
-`docker compose --env-file .env.stack up -d --build`.
+1. The **db** container initialises a PostgreSQL volume and runs `schema.sql`
+   before it accepts connections.
+2. The **app** container waits for the database health check, then runs
+   `docker/bootstrap.mjs`.
+3. The bootstrap applies `schema.sql` **and every other `.sql` file** in the
+   repository. The files are not numbered and their dependencies do not follow
+   alphabetical order, so it makes repeated passes, retrying whatever failed,
+   until a pass makes no progress. On a clean database this applies **10 of 10**
+   files.
+4. It seeds three lab accounts — **only when the `users` table is empty**, so
+   restarting never overwrites accounts you created yourself.
+5. It prints the account credentials and TOTP secrets **once**, because the
+   secrets are stored encrypted and cannot be recovered afterwards.
+6. The Express server starts on port 3000 and Caddy proxies port 80 to it.
 
-Node 20+ is only needed to run the pentest tools from a terminal rather than
-from the UI.
+The expected log looks like this:
+
+```text
+[bootstrap] database reachable after 1 attempt(s)
+[bootstrap] schema: pass 1 applied 6, retrying 4
+[bootstrap] schema: 10/10 file(s) applied
+[bootstrap] accounts: users table is empty, seeding lab accounts
+==============================
+ LAB ACCOUNTS CREATED
+==============================
+ bank scan account
+   username     : scan-bank
+   totpSecret   : OFLS6MD3GNEVKNRSHEYEW6DYLVIWSXRI
+ ...
+[bootstrap] ready
+```
+
+Read it with:
 
 ```bash
-git clone https://github.com/Shekin2005/AI-Smartphone-Security-Simulator.git
-cd AI-Smartphone-Security-Simulator
+docker compose logs app
+```
 
+### 4. The accounts it creates
+
+| App | Username | Password | Role | TOTP secret |
+| --- | --- | --- | --- | --- |
+| Bank | `scan-bank` | `ScanLab!2026pass` | `bank_user` | `OFLS6MD3GNEVKNRSHEYEW6DYLVIWSXRI` |
+| Acadia | `scan-student` | `ScanLab!2026pass` | `student` | `NAWFGQ2TKBTW2PSUJVDSCKLTH5KG4ZLC` |
+| Acadia | `professor` | `Acadia-Admin-2026!` | `admin` | `IYZUKTCLOFJCKQKVLVLHEQC3PFDWKMDQ` |
+
+These secrets are **fixed on purpose**. The scanners in `tools/` use them as
+defaults, so a fresh clone can run a pentest immediately instead of creating
+accounts first. Add any of them to Google Authenticator, Microsoft
+Authenticator or 1Password, or generate a code on the command line:
+
+```bash
+node tools/totp-code.mjs OFLS6MD3GNEVKNRSHEYEW6DYLVIWSXRI
+```
+
+The administrator signs in through the **Administrator Login** card inside the
+Acadia app, not the student form. The login API requires the role to match the
+stored value, so an administrator's credentials are rejected by the student form
+by design.
+
+### 5. Changing the port or the address
+
+Every default can be overridden with an environment variable:
+
+```bash
+# serve on port 8080 instead of 80
+HTTP_PORT=8080 PUBLIC_ORIGIN=http://localhost:8080 docker compose up -d
+
+# publish on a real hostname with automatic HTTPS
+SITE_ADDRESS=demo.example.com PUBLIC_ORIGIN=https://demo.example.com docker compose up -d
+```
+
+`PUBLIC_ORIGIN` must match the URL in the browser **exactly**, including scheme
+and port. It is compared against the request's `Origin` header, so
+`http://localhost` and `http://localhost:8080` are different values and a
+mismatch makes every POST return 403.
+
+To use an existing PostgreSQL server instead of the bundled container, copy the
+template and point it at your database:
+
+```bash
 cp .env.stack.example .env.stack
-# fill in DATABASE_URL, SESSION_SECRET, TOTP_ENCRYPTION_KEY, PUBLIC_ORIGIN
-chmod 600 .env.stack
-
+# set DATABASE_URL, SESSION_SECRET, TOTP_ENCRYPTION_KEY, PUBLIC_ORIGIN
 docker compose --env-file .env.stack up -d --build
 ```
 
-Verify:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `HTTP_PORT` | `80` | Host port Caddy publishes |
+| `SITE_ADDRESS` | `:80` | Hostname Caddy serves; a real domain enables HTTPS |
+| `PUBLIC_ORIGIN` | `http://localhost` | Exact browser URL; must match or POSTs are refused |
+| `TOOL_BASE_URL` | `http://127.0.0.1:3000` | Address the in-container scanners attack |
+| `DATABASE_URL` | bundled `db` service | PostgreSQL connection string |
+| `SESSION_SECRET` | development value | Session signing key, 32+ characters |
+| `TOTP_ENCRYPTION_KEY` | development value | Exactly 64 hex characters; encrypts TOTP secrets |
+| `SEED_DEMO_ACCOUNTS` | `true` | Set `false` to start with no accounts |
+| `LAB_VULNERABLE_MODE` | `true` | Enables the deliberately vulnerable lab endpoints |
+| `AI_LLM_KEY` | built-in free key | Overrides the key baked into `tools/ai-agent.mjs` |
+| `SHANNON_BRIDGE_TOKEN` | empty | Enables the Shannon pipeline button |
+
+The two development secrets are fine for a local demo. **Replace both** before
+putting this on a network, and generate them with:
 
 ```bash
-curl -s https://your-host/api/health     # {"status":"running"}
-docker compose --env-file .env.stack ps  # sim-app healthy, sim-caddy up
+openssl rand -base64 48   # SESSION_SECRET
+openssl rand -hex 32      # TOTP_ENCRYPTION_KEY
 ```
 
-Open the site, press the power button, unlock with `1234`, then sign in to
-Banking or Acadia.
+### 6. Verify the installation
+
+```bash
+# 1. containers up
+docker compose ps                     # db and caddy up, app up (healthy)
+
+# 2. application and database reachable
+curl -s http://localhost/api/health   # {"status":"running"}
+
+# 3. accounts were seeded
+docker compose exec db psql -U smartphone -d smartphone_security \
+  -c "select app, username, role from users order by role;"
+
+# 4. schema is complete
+docker compose exec db psql -U smartphone -d smartphone_security \
+  -c "\dt" | tail -20
+```
+
+### 7. Run a penetration test
+
+**From the UI.** Open the phone, choose **Attack Lab**, press
+**▶ Run Manual Pentest**. The suite signs in with the seeded accounts, runs 12
+checks and writes a report you can download from the same screen. The
+**AI Pentest** app does the same with an LLM agent.
+
+**From a terminal.** Node 20+ on the host, and the stack already running:
+
+```bash
+npm install                     # one time, compiles argon2
+PENTEST_BASE=http://localhost npm run pentest
+```
+
+A run takes about a minute — most of it is a deliberate 31-second wait that
+measures how long the MFA lockout lasts. Output goes to `tools/out/`.
+
+On a clean local stack you should see **3 confirmed vulnerabilities**:
+
+```text
+[*] Any bank user can read every student's name and tuition balance ... VULNERABLE (Medium)
+[*] MFA guessing is only weakly rate-limited ... VULNERABLE (Medium)
+[*] Session cookie flags ... VULNERABLE (Info)
+[*] Plain HTTP is not redirected to HTTPS ... inconclusive
+```
+
+Two of these are the findings the project is about. The other two depend on the
+scheme: a local stack runs over plain HTTP, so the cookie genuinely is not
+`Secure` and the redirect check cannot tell HTTPS from HTTP on a loopback
+address. On the HTTPS deployment those rows read differently. That difference is
+a property of the environment, not a change in the code.
+
+### 8. Stop, restart, reset
+
+```bash
+docker compose restart            # restart, keeping the database
+docker compose down               # stop, keeping the database volume
+docker compose down -v            # stop and DELETE the database
+docker compose up -d --build      # rebuild after a code change
+```
+
+`down -v` is the way to get a genuinely clean install: it removes the volume, so
+the next start re-applies the schema and re-seeds the accounts.
+
+### 9. Running without Docker
+
+Useful for editing code, because there is no rebuild step.
+
+```bash
+npm install
+cp .env.example .env      # then set DATABASE_URL, SESSION_SECRET, TOTP_ENCRYPTION_KEY
+psql "$DATABASE_URL" -f schema.sql
+npm start                 # http://127.0.0.1:3000
+```
+
+`npm install` compiles `argon2`, so the machine needs Python, `make` and a C++
+compiler. On Windows that means the Visual Studio Build Tools; on Debian or
+Ubuntu, `apt install build-essential python3`. A failure building `argon2` is
+almost always the missing compiler, not Node.
+
+This path has no Caddy, so `PUBLIC_ORIGIN` must be `http://127.0.0.1:3000`, and
+you create the accounts yourself:
+
+```bash
+node create-scan-account.js --app bank --username scan-bank --password "ScanLab!2026pass"
+node create-scan-account.js --app acadia --role admin --username professor --password "Acadia-Admin-2026!"
+```
+
+### 10. Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `port is already allocated` | Something already uses port 80 | `HTTP_PORT=8080 PUBLIC_ORIGIN=http://localhost:8080 docker compose up -d` |
+| Page loads, every POST returns 403 | `PUBLIC_ORIGIN` does not match the browser URL | Set it to the exact URL you type, scheme and port included |
+| Login accepts the password, then every request is unauthenticated | `Secure` cookie over plain HTTP | Covered by the defaults; if you set `PUBLIC_ORIGIN` to an `https://` URL, serve it over HTTPS |
+| `relation "users" does not exist` | Bootstrap was skipped or failed | `docker compose logs app`, then `docker compose down -v` and start again |
+| Accounts missing after an upgrade | Seeding only runs on an empty `users` table | Provision manually with `create-scan-account.js`, or `down -v` for a clean start |
+| `exec /app/docker/entrypoint.sh failed: No such file or directory` | Windows CRLF line endings on the shell script | Fixed by `.gitattributes` and a `sed` in the Dockerfile; re-clone if you have an old copy |
+| `npm ci` fails in the build with `EUSAGE` | `package.json` and `package-lock.json` out of sync | `npm install --package-lock-only`, commit the lockfile, rebuild |
+| Every TOTP code is rejected | The authenticator's clock has drifted | Enable automatic time sync, or use `node tools/totp-code.mjs <SECRET>` |
+| Scan buttons report a connection error | `TOOL_BASE_URL` points somewhere the app cannot reach | Leave it at the default `http://127.0.0.1:3000` for a Docker stack |
+| AI agent finishes with no findings | Free LLM key rate-limited or revoked | Set `AI_LLM_KEY` to your own key from <https://build.nvidia.com> |
+
+```
 
 ---
 
@@ -267,13 +457,14 @@ over time.
 
 ## Lab accounts
 
-| App | Username | Password | Role |
-| --- | --- | --- | --- |
-| Bank | `scan-bank` | `ScanLab!2026pass` | `bank_user` |
-| Acadia | `scan-student` | `ScanLab!2026pass` | `student` |
+| App | Username | Password | Role | TOTP secret |
+| --- | --- | --- | --- | --- |
+| Bank | `scan-bank` | `ScanLab!2026pass` | `bank_user` | `OFLS6MD3GNEVKNRSHEYEW6DYLVIWSXRI` |
+| Acadia | `scan-student` | `ScanLab!2026pass` | `student` | `NAWFGQ2TKBTW2PSUJVDSCKLTH5KG4ZLC` |
+| Acadia | `professor` | `Acadia-Admin-2026!` | `admin` | `IYZUKTCLOFJCKQKVLVLHEQC3PFDWKMDQ` |
 
-Both have TOTP enabled. The secrets live in the `.env.stack` configuration used
-by the tools, not in this README.
+All three have TOTP enabled, and all three are created automatically on first
+start (see [Setup on a new machine](#setup-on-a-new-machine)).
 
 These are deliberately weak accounts in a training lab. They are not secrets, and
 the simulator is not a real bank or university service.
@@ -282,7 +473,9 @@ the simulator is not a real bank or university service.
 
 ## Configuration
 
-Set in `.env.stack`:
+The stack runs with working defaults. Set these in `.env.stack` (and pass it
+with `--env-file`) only when you want to override them. The full table, with
+defaults, is in [Setup on a new machine](#5-changing-the-port-or-the-address).
 
 | Variable | Purpose |
 | --- | --- |
@@ -290,14 +483,15 @@ Set in `.env.stack`:
 | `SESSION_SECRET` | Session signing key (32+ chars) |
 | `TOTP_ENCRYPTION_KEY` | 64 hex chars; encrypts stored TOTP secrets. Changing it breaks every existing MFA enrolment. |
 | `PUBLIC_ORIGIN` | Exact public URL; the app compares `Origin` against this |
+| `TOOL_BASE_URL` | Where the in-container scanners attack; loopback in Docker |
 | `SITE_ADDRESS` | Address Caddy serves |
 
-Tool overrides:
+Tool overrides, when running a scanner from a terminal:
 
 | Variable | Default | Applies to |
 | --- | --- | --- |
-| `PENTEST_BASE` | public URL | manual suite target |
-| `AI_BASE` | public URL | AI agent target |
+| `PENTEST_BASE` | `http://localhost` | manual suite target |
+| `AI_BASE` | `http://localhost` | AI agent target |
 | `AI_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | AI agent model |
 | `AI_MODEL_FALLBACK` | `nvidia/nemotron-3.5-bolt-e4b` | used if the primary model errors or times out |
 | `AI_TARGET` | `both` | agent scope: `bank`, `school`, or `both` (the terminal sets this) |
@@ -346,7 +540,9 @@ tools/
   compare-engines.mjs     Manual vs AI scoring
   README-PENTEST.md       Detailed how-to-run guide
   out/                    Generated reports
-docker-compose.yml        caddy + app
+docker-compose.yml        caddy + app + db
+docker/bootstrap.mjs      schema application + account seeding on first start
+docker/entrypoint.sh      waits for the database, then starts the server
 Caddyfile                 Reverse proxy config
 DEPLOY-SELFHOST.md        Deployment on a single host
 PROJECT_GUIDE.md          Design notes

@@ -47,6 +47,10 @@ _INDUSTRY = [
     ("artemis", _EXTRA["artemis"]),
     ("semgrep", _EXTRA["semgrep"]),
     ("omdia", _EXTRA["omdia"]),
+    # Appended rather than inserted so the existing numbering stays stable; this
+    # is the companion post to reference 10 and carries the browser and OS
+    # findings that the 0-day programme post does not report.
+    ("anthropic_disc", _EXTRA["anthropic_disc"]),
 ]
 
 REFS15 = _CORE + _INDUSTRY
