@@ -2013,6 +2013,192 @@ app.get("/api/pentest/run", (req, res) => {
 });
 
 // ==================================================
+// SHANNON (WSL2) - proxied to the host bridge
+// ==================================================
+// Shannon needs Docker for its ephemeral worker container, and this container
+// has no Docker binary and no socket by design: mounting a Docker socket into a
+// publicly reachable app hands anyone who can sign up root-equivalent host
+// access. So Shannon runs on the Windows host inside WSL2 and the app talks to
+// a small bridge there (tools/shannon-bridge.mjs).
+//
+// The bridge binds to loopback only and requires the shared token below, so it
+// adds no network surface. Every route here still requires a signed-in session,
+// and the bridge independently refuses any target that is not this lab.
+// ==================================================
+
+const SHANNON_BRIDGE_PORT = process.env.SHANNON_BRIDGE_PORT || "7071";
+const SHANNON_BRIDGE_TOKEN = process.env.SHANNON_BRIDGE_TOKEN || "";
+const SHANNON_BRIDGE_URL = `http://host.docker.internal:${SHANNON_BRIDGE_PORT}`;
+
+async function shannonCall(pathname, { method = "GET", body, timeout = 20000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(`${SHANNON_BRIDGE_URL}${pathname}`, {
+      method,
+      headers: {
+        "x-bridge-token": SHANNON_BRIDGE_TOKEN,
+        ...(body ? { "content-type": "application/json" } : {})
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
+    });
+
+    const text = await response.text();
+    let parsed = null;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      /* not JSON */
+    }
+
+    return { status: response.status, parsed, text };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// The bridge is optional, so an unreachable bridge is reported as
+// "unavailable" rather than a 500 - the in-container agent keeps working.
+app.get("/api/shannon/health", async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in as a lab user first" });
+  }
+
+  if (!SHANNON_BRIDGE_TOKEN) {
+    return res.status(200).json({
+      ok: false,
+      configured: false,
+      error: "SHANNON_BRIDGE_TOKEN is not set on the app"
+    });
+  }
+
+  try {
+    const result = await shannonCall("/health", { timeout: 45000 });
+    return res.status(200).json({ configured: true, ...(result.parsed || {}) });
+  } catch (error) {
+    return res.status(200).json({
+      configured: true,
+      ok: false,
+      error: `Bridge unreachable on port ${SHANNON_BRIDGE_PORT}: ${error.message}`,
+      hint: "Start it with: node tools/shannon-bridge.mjs"
+    });
+  }
+});
+
+app.post("/api/shannon/start", async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in as a lab user first" });
+  }
+
+  const profile = ["validate", "pipeline", "full"].includes(req.body?.profile)
+    ? req.body.profile
+    : "validate";
+
+  // The bridge re-checks this, but validating here keeps an out-of-scope target
+  // from ever leaving the app.
+  const target = process.env.PUBLIC_ORIGIN || "https://shekin.tail97139a.ts.net";
+
+  try {
+    const result = await shannonCall("/start", {
+      method: "POST",
+      body: { url: target, profile },
+      timeout: 120000
+    });
+
+    return res.status(result.status).json(result.parsed || { error: result.text });
+  } catch (error) {
+    return res.status(502).json({ error: `Bridge unreachable: ${error.message}` });
+  }
+});
+
+app.get("/api/shannon/status", async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in as a lab user first" });
+  }
+
+  try {
+    const result = await shannonCall("/status");
+    return res.status(result.status).json(result.parsed || { error: result.text });
+  } catch (error) {
+    return res.status(502).json({ error: `Bridge unreachable: ${error.message}` });
+  }
+});
+
+app.get("/api/shannon/logs", async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in as a lab user first" });
+  }
+
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+
+  try {
+    const result = await shannonCall(`/logs?offset=${offset}`);
+    return res.status(result.status).json(result.parsed || { error: result.text });
+  } catch (error) {
+    return res.status(502).json({ error: `Bridge unreachable: ${error.message}` });
+  }
+});
+
+app.post("/api/shannon/stop", async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in as a lab user first" });
+  }
+
+  try {
+    const result = await shannonCall("/stop", { method: "POST", timeout: 90000 });
+    return res.status(result.status).json(result.parsed || { error: result.text });
+  } catch (error) {
+    return res.status(502).json({ error: `Bridge unreachable: ${error.message}` });
+  }
+});
+
+app.get("/api/shannon/report", async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in as a lab user first" });
+  }
+
+  const format = ["md", "pdf", "json", "sarif"].includes(req.query.format)
+    ? req.query.format
+    : "md";
+
+  let upstream;
+
+  try {
+    upstream = await fetch(
+      `${SHANNON_BRIDGE_URL}/report?format=${encodeURIComponent(format)}`,
+      { headers: { "x-bridge-token": SHANNON_BRIDGE_TOKEN } }
+    );
+  } catch (error) {
+    return res.status(502).json({ error: `Bridge unreachable: ${error.message}` });
+  }
+
+  if (!upstream.ok) {
+    const text = await upstream.text();
+    return res.status(upstream.status).json({ error: "No Shannon report yet", detail: text });
+  }
+
+  const contentType = upstream.headers.get("content-type") || "text/markdown; charset=utf-8";
+  const filename = `SHANNON-REPORT.${format}`;
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader(
+    "Content-Disposition",
+    req.query.download === "1" ? `attachment; filename="${filename}"` : "inline"
+  );
+
+  try {
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    res.setHeader("Content-Length", buffer.length);
+    return res.status(200).end(buffer);
+  } catch (error) {
+    return res.status(502).json({ error: `Could not read the report: ${error.message}` });
+  }
+});
+
+// ==================================================
 // ATTACK LAB TERMINAL - run real tools
 // ==================================================
 // This backs the prompt on the Attack Lab screen. It is deliberately NOT a

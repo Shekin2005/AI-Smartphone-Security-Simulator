@@ -46,6 +46,13 @@ services:
       LAB_VULNERABLE_MODE: ${LAB_VULNERABLE_MODE:-true}
       LAB_RECOVERY_DATABASE_URL: ${LAB_RECOVERY_DATABASE_URL:-}
 
+      # Shannon runs on the host inside WSL2 (it needs Docker, and this container
+      # deliberately has no Docker socket). These let the app reach the small
+      # loopback bridge that drives it. Empty token = the button reports
+      # "bridge not configured" rather than failing mysteriously.
+      SHANNON_BRIDGE_TOKEN: ${SHANNON_BRIDGE_TOKEN:-}
+      SHANNON_BRIDGE_PORT: ${SHANNON_BRIDGE_PORT:-7071}
+
     networks:
       - web
 

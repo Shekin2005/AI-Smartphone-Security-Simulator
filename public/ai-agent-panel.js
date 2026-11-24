@@ -121,6 +121,11 @@
     stopButton.disabled = true;
 
     stopButton.addEventListener("click", () => {
+      // The Shannon panel drives Stop when its engine is selected.
+      if (window.__pentestEngine === "shannon") {
+        return;
+      }
+
       stop();
       setBusy(false, "Stopped.");
       setBadge("STOPPED", "idle");
@@ -130,6 +135,12 @@
   }
 
   runButton.addEventListener("click", () => {
+    // One Run button serves both engines. shannon-panel.js captures the click
+    // first, and this guard makes the separation explicit either way.
+    if (window.__pentestEngine === "shannon") {
+      return;
+    }
+
     stop();
 
     const steps = Number(stepsSelect?.value) || 5;

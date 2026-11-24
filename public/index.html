@@ -18,6 +18,7 @@
 <script src="./school-services.js" defer></script>
 <script src="./colleague-rework.js" defer></script>
 <script src="./ai-agent-panel.js" defer></script>
+<script src="./shannon-panel.js" defer></script>
 <link rel="stylesheet" href="./school-upgrade.css">
 <link rel="stylesheet" href="./colleague-rework.css">
   
@@ -907,7 +908,7 @@
     <header class="defender-heading">
         <div>
             <h2>🧪 AI Pentest</h2>
-            <p>autonomous agent &middot; tools/ai-agent.mjs</p>
+            <p>agent in-container &middot; Shannon in WSL2</p>
         </div>
 
         <span id="ai-agent-badge"
@@ -916,6 +917,14 @@
     </header>
 
     <div>
+    <span class="pt-label">Engine</span>
+    <div class="pt-scope" role="group" aria-label="Pentest engine">
+        <button type="button" class="pt-scope-button active" data-ai-engine="agent">In-container agent</button>
+        <button type="button" class="pt-scope-button" data-ai-engine="shannon">Shannon &middot; WSL2</button>
+    </div>
+    <p class="pt-hint">Shannon runs on the host (it needs Docker for its worker), so it is driven through a bridge. The agent runs inside this container.</p>
+</div>
+<div>
         <span class="pt-label">Target application</span>
         <div class="pt-scope" role="group" aria-label="Target application">
             <button type="button" class="pt-scope-button active" data-ai-target="bank">🏦 Banking</button>
@@ -925,18 +934,28 @@
     </div>
 
     <div class="pt-row">
-        <div style="flex:1 1 120px">
-            <label class="pt-label" for="ai-agent-steps">Decisions</label>
-            <select id="ai-agent-steps">
-                <option value="3">3 &middot; quick (~3 min)</option>
-                <option value="5" selected>5 &middot; demo (~5 min)</option>
-                <option value="8">8 &middot; thorough (~8 min)</option>
-            </select>
-        </div>
+    <div id="ai-steps-wrap" style="flex:1 1 120px">
+        <label class="pt-label" for="ai-agent-steps">Decisions</label>
+        <select id="ai-agent-steps">
+            <option value="3">3 &middot; quick (~3 min)</option>
+            <option value="5" selected>5 &middot; demo (~5 min)</option>
+            <option value="8">8 &middot; thorough (~8 min)</option>
+        </select>
     </div>
 
-    <div class="pt-actions">
+    <div id="shannon-profile-wrap" style="flex:1 1 150px" hidden>
+        <label class="pt-label" for="shannon-profile">Shannon run</label>
+        <select id="shannon-profile">
+            <option value="validate" selected>Validate only (~30 s)</option>
+            <option value="pipeline">Pipeline test (fast)</option>
+            <option value="full">Full pentest (~1 h)</option>
+        </select>
+    </div>
+</div>
+
+    <div class="pt-actions" id="ai-run-wrap">
         <button type="button" id="ai-agent-run" class="primary">▶ Run AI Pentest</button>
+        <button type="button" id="shannon-validate" hidden>✓ Validate model</button>
         <button type="button" id="ai-agent-stop">■ Stop</button>
         <a id="ai-agent-report" href="/api/ai-agent/report?download=1">⬇ Report</a>
     </div>
