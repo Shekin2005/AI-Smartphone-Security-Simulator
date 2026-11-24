@@ -150,7 +150,8 @@ let recentApps = [];
 const appNames = {
     banking: "🏦 Banking",
     university: "🎓 Acadia Student",
-    defender: "🛡️ AI Defender",
+    defender: "🧪 AI Pentest",
+    attack: "🖥️ Attack Lab",
     "phone-app": "📞 Phone",
     "browser-app": "🌐 Browser",
     "messages-app": "💬 Messages",

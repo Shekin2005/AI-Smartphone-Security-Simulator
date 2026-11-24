@@ -1775,6 +1775,14 @@ app.get("/api/ai-agent/run", (req, res) => {
     Math.min(20, Number(req.query.steps) || 6)
   );
 
+  // Which application the agent is allowed to attack. Anything outside the two
+  // known names falls back to both, so a typo in the URL cannot leave the agent
+  // with an empty scope.
+  const requestedScope = String(req.query.target || "both").toLowerCase();
+  const scope = ["bank", "school"].includes(requestedScope)
+    ? requestedScope
+    : "both";
+
   const send = (event, payload) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
   };
@@ -1790,7 +1798,17 @@ app.get("/api/ai-agent/run", (req, res) => {
     process.env.PUBLIC_ORIGIN ||
     "https://shekin.tail97139a.ts.net";
 
-  send("start", { steps, target });
+  // Hand the agent the caller's own session so it does not log in a second
+  // time. The caller is already MFA-verified (that is how they reached this
+  // route), and a second TOTP login would replay the same 30-second code and
+  // spend auth rate-limit budget the demo cannot afford.
+  const callerCookie = req.headers.cookie || "";
+  const callerApp =
+    req.session.app === "bank" || req.session.app === "acadia"
+      ? req.session.app
+      : "";
+
+  send("start", { steps, target, scope });
 
   const child = spawn(
     process.execPath,
@@ -1800,6 +1818,10 @@ app.get("/api/ai-agent/run", (req, res) => {
       env: {
         ...process.env,
         AI_BASE: target,
+        AI_TARGET: scope,
+        AI_SESSION_COOKIE: callerCookie,
+        // The agent speaks in bank/school; the session stores bank/acadia.
+        AI_SESSION_APP: callerApp === "acadia" ? "school" : callerApp,
         AI_MAX_STEPS: String(steps),
         AI_DEADLINE_MS: "900000"
       }
@@ -1865,6 +1887,15 @@ app.get("/api/ai-agent/report", (req, res) => {
     return res.status(404).json({
       error: "No report yet - run the agent first"
     });
+  }
+
+  // ?download=1 turns the same response into a file download, so the panel can
+  // offer a button instead of rendering raw Markdown in a tab.
+  if (req.query.download) {
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="AI-PENTEST-REPORT.md"'
+    );
   }
 
   res.type("text/markdown").send(readFileSync(reportPath, "utf8"));
@@ -1992,6 +2023,13 @@ app.get("/api/pentest/report", (req, res) => {
     return res.status(404).json({
       error: "No report yet - run the pentest first"
     });
+  }
+
+  if (req.query.download) {
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="MANUAL-PENTEST-REPORT.md"'
+    );
   }
 
   res.type("text/markdown").send(readFileSync(reportPath, "utf8"));

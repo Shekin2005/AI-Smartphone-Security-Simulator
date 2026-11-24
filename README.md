@@ -1,8 +1,9 @@
 # AI Smartphone Security Simulator
 
 A phone-shaped web simulator with two deliberately vulnerable applications, an
-AI Defender console, and an Attack Lab that runs a real penetration test against
-the running system.
+AI Pentest terminal, and an Attack Lab that runs a real penetration test against
+the running system. Both pentest screens are terminals: they stream live output
+and hand you a finished Markdown report.
 
 **Live:** https://shekin.tail97139a.ts.net (phone passcode `1234`)
 
@@ -19,8 +20,8 @@ rather than asserted.
 | --- | --- |
 | 🏦 **Banking** | Accounts, payments, tuition lookup. MFA-enforced. |
 | 🎓 **Acadia Student** | Enrollments, services, tuition summary. MFA-enforced. |
-| 🛡️ **AI Defender** | Streams an LLM agent that chooses its own attacks. |
-| ⚠️ **Attack Lab** | Runs a real SQL injection and the deterministic pentest. |
+| 🧪 **AI Pentest** | Terminal that runs an LLM agent against banking, school, or both, then downloads its report. |
+| 🖥️ **Attack Lab** | Manual pentest terminal (12 checks) plus a real SQL injection. |
 
 Both applications are real Express routes with PostgreSQL-backed sessions,
 Argon2 password hashing, and TOTP second factors. They are intentionally
@@ -40,7 +41,7 @@ imperfect — that is what the pentest tooling exists to find.
               ┌─────▼──────┐
               │    app     │  Node/Express
               │            │  · Banking + Acadia routes
-              │            │  · AI Defender (spawns tools/ai-agent.mjs)
+              │            │  · AI Pentest  (spawns tools/ai-agent.mjs)
               │            │  · Attack Lab  (real SQLi + spawns tools/pentest-suite.mjs)
               └─────┬──────┘
                     │
@@ -91,14 +92,24 @@ verified ground truth. All three run from the website **and** from a terminal.
 | --- | --- | --- |
 | Attack Lab | **▶ Run Exploit** | `POST /api/lab/exploit/sqli` |
 | Attack Lab | **▶ Run Manual Pentest** | `tools/pentest-suite.mjs` |
-| AI Defender | **▶ Run AI Agent** | `tools/ai-agent.mjs` |
+| Attack Lab | **⤓ Download report** | `GET /api/pentest/report?download=1` |
+| AI Pentest | **Bank / School / Both** | scope passed to `tools/ai-agent.mjs` as `AI_TARGET` |
+| AI Pentest | **▶ Run** | `tools/ai-agent.mjs` at 3, 5 or 8 decisions |
+| AI Pentest | **⤓ Download report** | `GET /api/ai-agent/report?download=1` |
 
-All three stream live output into the panel and link to the generated report.
-All three require a signed-in, MFA-verified session.
+All three engines stream live output into their terminal and produce a report
+you can download from the same screen. All three require a signed-in,
+MFA-verified session.
 
 The exploit runs in under a second. The manual run takes about a minute. The AI
-run takes about five, because the free hosted model needs roughly a minute per
-decision.
+run takes seconds per decision on the free hosted model (see
+`AI_MODEL`), and the terminal reports how many requests it chose to send.
+
+Because the browser session is already MFA-verified, the server hands that
+cookie to the agent (`AI_SESSION_COOKIE`) instead of logging in a second time;
+a second TOTP login would replay the same 30-second code and spend auth
+rate-limit budget. When the run covers the other application, the agent logs in
+for that app normally.
 
 ### The real exploit
 
@@ -208,8 +219,10 @@ A recording order that shows the whole argument in about eight minutes.
    against the running database.
 5. **Attack Lab** → **▶ Run Manual Pentest**. About a minute, 12 checks,
    3 confirmed vulnerabilities, then the report link.
-6. **AI Defender** → **▶ Run AI Agent**. About five minutes: the model's own
-   requests stream past, and it writes its own report.
+6. **AI Pentest** → choose **Bank**, 5 decisions → **▶ Run**. The model's own
+   requests stream past as it chooses identifiers to test, and it writes its own
+   report. **⤓ Download report** saves `AI-PENTEST-REPORT.md`. Switch the scope to
+   **School** or **Both** to show the same terminal covering the second app.
 7. In a terminal, `npm run compare` scores both against ground truth and
    writes `tools/out/COMPARISON-REPORT.md`.
 
@@ -254,8 +267,10 @@ Tool overrides:
 | --- | --- | --- |
 | `PENTEST_BASE` | public URL | manual suite target |
 | `AI_BASE` | public URL | AI agent target |
-| `AI_MODEL` | `moonshotai/kimi-k3.1-pro` | AI agent model |
-| `AI_MAX_STEPS` | `16` | AI agent decision budget |
+| `AI_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | AI agent model |
+| `AI_MODEL_FALLBACK` | `nvidia/nemotron-3.5-bolt-e4b` | used if the primary model errors or times out |
+| `AI_TARGET` | `both` | agent scope: `bank`, `school`, or `both` (the terminal sets this) |
+| `AI_MAX_STEPS` | `16` | AI agent decision budget (the terminal offers 3, 5 or 8) |
 | `AI_LLM_KEY` | built-in free key | AI agent key override |
 
 ---
@@ -290,9 +305,10 @@ school-routes.js          Acadia endpoints
 school-services-routes.js Acadia services
 public/                   Phone UI and app front-ends
   app.js                  Phone navigation, lock screen, power
-  ai-agent-panel.js       AI Defender run + stream
-  attack-lab-pentest.js   Attack Lab run + stream
+  ai-agent-panel.js       AI Pentest terminal: scope, steps, run, report
+  attack-lab-pentest.js   Attack Lab manual pentest terminal + report
   attack-lab-exploit.js   Attack Lab real SQL injection
+  pentest-terminal.css    Terminal styling shared by both screens
 tools/
   pentest-suite.mjs       Deterministic pentest
   ai-agent.mjs            LLM-driven agent
@@ -325,9 +341,11 @@ PROJECT_GUIDE.md          Design notes
 - The SQL injection reads only. Its transaction is `READ ONLY`, its target
   rows are pinned by a `MATERIALIZED` CTE, and it cannot reach another table.
 - No fuzzing beyond the targeted injection probes in the suite.
-- The AI agent runs on a free hosted model: ~1 minute per decision, and it does
-  not always self-report findings. The harness therefore confirms findings
-  deterministically from the responses the model actually received.
+- The AI agent runs on a free hosted model. The default is a small, fast
+  tool-calling model (well under a second per decision); if that endpoint fails,
+  the agent falls back to a second free model and names the one it used in the
+  report. It does not always self-report findings, so the harness also confirms
+  findings deterministically from the responses the model actually received.
 - The comparison's AI column is single-run, not averaged.
 
 ---

@@ -1,6 +1,6 @@
 {
   "target": "https://shekin.tail97139a.ts.net",
-  "generated_at": "2026-11-24T00:16:42.949Z",
+  "generated_at": "2026-11-24T06:34:33.027Z",
   "results": [
     {
       "id": "headers",
@@ -149,11 +149,11 @@
       "category": "Broken object level authorization (BOLA/IDOR)",
       "cwe": "CWE-639",
       "vulnerable": true,
-      "summary": "10 student record(s) - names and outstanding tuition - were disclosed to a bank account with no relationship to them.",
+      "summary": "12 student record(s) - names and outstanding tuition - were disclosed to a bank account with no relationship to them.",
       "evidence": [
         {
           "request": "GET /api/bank/tuition/student/AC00000001..AC00000090 (bank session, 4 at a time)",
-          "response": "10 student record(s) disclosed"
+          "response": "12 student record(s) disclosed"
         },
         {
           "request": "GET /api/bank/tuition/student/AC00000034",
@@ -189,7 +189,7 @@
         },
         {
           "request": "(truncated)",
-          "response": "2 further student record(s) also disclosed"
+          "response": "4 further student record(s) also disclosed"
         }
       ],
       "remediation": "The lookup must be scoped to students the caller has a legitimate relationship with. Instead of a bare sequential ID, require a payer/student link (for example a row in a payments or tuition-link table for req.session.userId) and return 404 when no link exists. Replace the sequential AC######## identifier with an unguessable reference, and rate-limit enumeration."

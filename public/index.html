@@ -7,6 +7,7 @@
         content="width=device-width, initial-scale=1.0">
   <title>AI Smartphone Security Simulator</title>
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./pentest-terminal.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1220'/%3E%3Crect x='10' y='6' width='12' height='20' rx='3' fill='none' stroke='%2338e8d0' stroke-width='2'/%3E%3C/svg%3E">
 <script src="./app.js" defer></script>
 <script src="./attack-lab-pentest.js?v=manual-pentest-20261123" defer></script>
@@ -25,7 +26,7 @@
 <body>
   <header class="page-header">
     <h1>AI Smartphone Security Simulator</h1>
-    <p>3D Smartphone · Secure Accounts · AI Defender</p>
+    <p>3D Smartphone · Secure Accounts · AI Pentest Terminal</p>
   </header>
 
   <main class="scene">
@@ -121,12 +122,12 @@
             </button>
 
             <button data-open="defender">
-              <span class="app-icon defender-icon">🛡️</span>
-              AI Defender
+              <span class="app-icon defender-icon">🧪</span>
+              AI Pentest
             </button>
 
             <button data-open="attack">
-              <span class="app-icon attack-icon">⚠️</span>
+              <span class="app-icon attack-icon">🖥️</span>
               Attack Lab
             </button>
           </div>
@@ -895,439 +896,143 @@
         ====================================== -->
         
 <!-- ==========================================
-     AI DEFENDER DASHBOARD
+     AI PENTEST TERMINAL
+     Runs tools/ai-agent.mjs against the chosen app.
 ========================================== -->
 
 <section id="defender"
-         class="screen app-screen dark-app defender-screen">
+         class="screen app-screen dark-app pentest-terminal">
 
-    <!-- Dashboard heading -->
     <header class="defender-heading">
         <div>
-            <h2>🛡️ AI Defender</h2>
-            <p>Real-Time Security Monitoring</p>
+            <h2>🧪 AI Pentest</h2>
+            <p>autonomous agent &middot; tools/ai-agent.mjs</p>
         </div>
 
-        <span id="defender-status-badge"
-              class="defender-badge">
-            CHECKING
-        </span>
+        <span id="ai-agent-badge"
+              class="defender-badge"
+              data-state="idle">IDLE</span>
     </header>
 
-    <!-- AI Defender ON/OFF -->
-    <div class="defender-panel">
-
-        <div class="defender-switch-row">
-            <div>
-                <strong>Attack Protection</strong>
-                <p>Enable simulated protection</p>
-            </div>
-
-            <label class="defender-switch"
-                   aria-label="Enable AI Defender">
-
-                <input type="checkbox"
-                       id="defender-toggle"
-                       checked>
-
-                <span class="defender-switch-track"></span>
-            </label>
+    <div>
+        <span class="pt-label">Target application</span>
+        <div class="pt-scope" role="group" aria-label="Target application">
+            <button type="button" class="pt-scope-button active" data-ai-target="bank">🏦 Banking</button>
+            <button type="button" class="pt-scope-button" data-ai-target="school">🎓 Acadia</button>
+            <button type="button" class="pt-scope-button" data-ai-target="both">Both</button>
         </div>
-
-        <p id="defender-toggle-message"
-           role="status">
-            Checking Defender status...
-        </p>
     </div>
 
-    <!-- Attack statistics -->
-    <div class="defender-stats"
-         aria-label="Attack statistics">
-
-        <div class="defender-stat">
-            <small>Attacks</small>
-            <strong id="attack-count">0</strong>
+    <div class="pt-row">
+        <div style="flex:1 1 120px">
+            <label class="pt-label" for="ai-agent-steps">Decisions</label>
+            <select id="ai-agent-steps">
+                <option value="3">3 &middot; quick (~3 min)</option>
+                <option value="5" selected>5 &middot; demo (~5 min)</option>
+                <option value="8">8 &middot; thorough (~8 min)</option>
+            </select>
         </div>
-
-        <div class="defender-stat">
-            <small>Blocked</small>
-            <strong id="blocked-count">0</strong>
-        </div>
-
-        <div class="defender-stat">
-            <small>Succeeded</small>
-            <strong id="succeeded-count">0</strong>
-        </div>
-
     </div>
 
-    <!-- Attack activity heading -->
-    <div class="defender-activity-heading">
-        <h3>Live Attack Activity</h3>
-
-        <button id="refresh-security"
-                class="defender-refresh"
-                type="button">
-            ↻ Refresh
-        </button>
+    <div class="pt-actions">
+        <button type="button" id="ai-agent-run" class="primary">▶ Run AI Pentest</button>
+        <button type="button" id="ai-agent-stop">■ Stop</button>
+        <a id="ai-agent-report" href="/api/ai-agent/report?download=1">⬇ Report</a>
     </div>
 
-    <!-- Backend connection status -->
-    <p id="security-status"
-       class="defender-substatus"
-       role="status">
-        Waiting for authenticated session
+    <p class="pt-status" id="ai-agent-status">
+        Sign in to the bank or Acadia app, then run.
     </p>
 
-    <!-- JavaScript inserts attack cards here -->
-    <div id="security-logs"
-         aria-live="polite"></div>
+    <pre id="ai-agent-log"
+         class="pt-terminal"
+         aria-live="polite">[idle] waiting for a run...</pre>
 
-    <p class="note">
-        These are real attacks on this running
-        application. Every incident in the history
-        below came from an actual HTTP request
-        against the live database — nothing here
-        is scripted output. The data is fictional;
-        the exploitation is not. Attack history
-        remains available when protection is OFF.
-    </p>
-
-    <!-- ==========================================
-         AI PENTEST AGENT
-         Runs the same agent as `npm run ai` from the
-         command line, streamed live into this panel.
-         ========================================== -->
-    <div class="defender-panel" id="ai-agent-panel">
-
-        <div class="defender-switch-row">
-            <div>
-                <strong>AI Pentest Agent</strong>
-                <p>
-                    An LLM chooses the requests itself.
-                    It signs in with the lab accounts and
-                    tests both applications.
-                </p>
-            </div>
-
-            <button type="button"
-                    id="ai-agent-run"
-                    class="defender-refresh">
-                ▶ Run AI Agent
-            </button>
-        </div>
-
-        <p class="note" id="ai-agent-status">
-            Idle. Sign in first, then run.
-        </p>
-
-        <pre id="ai-agent-log"
-             aria-live="polite"
-             style="max-height:320px;overflow:auto;
-                    white-space:pre-wrap;text-align:left;
-                    font-size:12px;line-height:1.55;
-                    margin:0;padding:12px;
-                    border-radius:10px;
-                    background:rgba(0,0,0,0.35);"></pre>
-
-        <p class="note">
-            <a id="ai-agent-report"
-               href="/api/ai-agent/report"
-               target="_blank"
-               rel="noopener">
-                View the generated report
-            </a>
-        </p>
-
+    <!-- Legacy AI Defender controls. Kept in the DOM, visually hidden, because
+         app.js still binds to them; removing them would throw on load. -->
+    <div hidden aria-hidden="true">
+        <input type="checkbox" id="defender-toggle" checked>
+        <p id="defender-toggle-message"></p>
+        <span id="defender-status-badge"></span>
+        <strong id="attack-count"></strong>
+        <strong id="blocked-count"></strong>
+        <strong id="succeeded-count"></strong>
+        <button type="button" id="refresh-security"></button>
+        <p id="security-status"></p>
+        <div id="security-logs"></div>
     </div>
 
 </section>
 
 
         <!-- ==========================================
-     ATTACK LAB — CYBERSECURITY GAME
-     ========================================== -->
-<section id="attack" class="screen app-screen dark-app">
+     ATTACK LAB - MANUAL PENTEST TERMINAL
+     Runs tools/pentest-suite.mjs, the same run as
+     `npm run pentest` in a VS Code terminal.
+========================================== -->
 
-    <div id="lab-auth" class="cyber-lab" style="padding:14px">
-      <h2>🔐 Attack Lab</h2><p id="lab-auth-message">Sign in or create an account to continue.</p>
-      <form id="lab-auth-form" autocomplete="on">
-        <input id="lab-auth-user" placeholder="Username" autocomplete="username" required minlength="3" maxlength="40" style="width:100%;margin:6px 0;padding:10px" />
-        <input id="lab-auth-password" type="password" placeholder="Password (12+ characters)" autocomplete="current-password" required minlength="12" style="width:100%;margin:6px 0;padding:10px" />
-        <button type="submit" id="lab-auth-submit">Sign in</button>
-        <button type="button" id="lab-auth-toggle">Create account</button>
-      </form>
+<section id="attack"
+         class="screen app-screen dark-app pentest-terminal">
+
+    <header class="defender-heading">
+        <div>
+            <h2>🖥️ Attack Lab</h2>
+            <p>manual pentest &middot; tools/pentest-suite.mjs</p>
+        </div>
+
+        <span id="lab-badge"
+              class="defender-badge"
+              data-state="idle">IDLE</span>
+    </header>
+
+    <p class="pt-hint">
+        The same run as <code>npm run pentest</code>: 12 checks against both
+        applications, each proven with the request and response that produced it.
+    </p>
+
+    <div class="pt-actions">
+        <button type="button" id="lab-pentest-run" class="primary">▶ Run Manual Pentest</button>
+        <button type="button" id="lab-pentest-clear">Clear</button>
+        <a id="lab-pentest-report" href="/api/pentest/report?download=1">⬇ Report</a>
     </div>
-    <div id="lab-upgrade" class="cyber-lab" hidden>
-      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px">
-        <span id="lab-signed-in"></span><button type="button" id="lab-logout">Logout</button>
-      </div>
 
-        <!-- Game heading -->
-        <div class="cyber-header">
-            <span class="cyber-kicker">CYBER RANGE / 01</span>
-            <h2>🛡️ ATTACK LAB</h2>
-            <span class="cyber-status">● LOCAL SANDBOX</span>
-            <p>Choose a target application and attack category.</p>
-        </div>
-
-        
-<!-- ATTACK LAB DEFENDER STATUS -->
-<div class="cyber-panel">
-    <h3>🛡️ Connected AI Defender App</h3>
-
-    <p id="lab-defender-status">
-        Checking protection status...
+    <p class="pt-status" id="lab-pentest-status">
+        Sign in first, then run. Takes about a minute.
     </p>
 
-    <p class="cyber-muted">
-        Protection is controlled by the separate AI Defender app. Sign in to the selected target and complete MFA.
-    </p>
-</div>
+    <pre id="lab-pentest-output"
+         class="pt-terminal"
+         aria-live="polite">[idle] waiting for a run...</pre>
 
+    <span class="pt-label">Real SQL injection</span>
 
-        <!-- ==========================================
-             MANUAL PENTEST
-             Runs the deterministic suite (tools/
-             pentest-suite.mjs) against the live apps
-             and streams the result here.
-             ========================================== -->
-        <div class="cyber-panel" id="lab-pentest-panel">
-            <div class="cyber-section-heading">
-                <h3>01 / MANUAL PENTEST</h3>
-                <span>NO AI</span>
-            </div>
-
-            <p class="cyber-muted">
-                A fixed, repeatable test suite. It signs in with the lab
-                accounts, attacks both applications, and proves every
-                result with the actual HTTP request and response. No model
-                is involved, so the same run always gives the same answer.
-            </p>
-
-            <div class="cyber-actions">
-                <button type="button" id="lab-pentest-run">
-                    ▶ Run Manual Pentest
-                </button>
-                <button type="button" id="lab-pentest-clear">
-                    Clear
-                </button>
-            </div>
-
-            <p id="lab-pentest-status" class="cyber-muted">
-                Idle. Sign in to the lab, then run.
-            </p>
-
-            <pre id="lab-pentest-output"
-                 aria-live="polite"
-                 style="max-height:300px;overflow:auto;
-                        white-space:pre-wrap;text-align:left;
-                        font-size:12px;line-height:1.55;
-                        margin:0;padding:12px;
-                        border-radius:10px;
-                        background:rgba(0,0,0,0.45);">[SYSTEM] Waiting to run...</pre>
-
-            <p class="cyber-muted">
-                <a id="lab-pentest-report"
-                   href="/api/pentest/report"
-                   target="_blank"
-                   rel="noopener">
-                    View the generated report
-                </a>
-            </p>
-        </div>
-
-        <!-- ==========================================
-             REAL EXPLOIT - SQL INJECTION
-             Runs a genuine injection against the live
-             database. The parameterised and vulnerable
-             queries are both executed so the difference
-             is measurable, and the leaked rows are real.
-             ========================================== -->
-        <div class="cyber-panel" id="lab-exploit-panel">
-            <div class="cyber-section-heading">
-                <h3>02 / REAL EXPLOIT</h3>
-                <span>LIVE DATABASE</span>
-            </div>
-
-            <p class="cyber-muted">
-                A real SQL injection. Two queries run against PostgreSQL:
-                one parameterised, one with your input concatenated into the
-                statement. Whatever comes back is read from the database.
-                The run is read-only and cannot leave the selected application.
-            </p>
-
-            <label class="cyber-muted" for="lab-exploit-payload">Payload</label>
+    <div class="pt-row">
+        <div style="flex:2 1 150px">
             <input id="lab-exploit-payload"
                    value="' OR '1'='1"
                    spellcheck="false"
-                   autocomplete="off">
-
-            <label class="cyber-muted" for="lab-exploit-target">Target</label>
-            <select id="lab-exploit-target">
-                <option value="school">Acadia (school)</option>
+                   autocomplete="off"
+                   aria-label="SQL injection payload">
+        </div>
+        <div style="flex:1 1 100px">
+            <select id="lab-exploit-target" aria-label="Injection target">
+                <option value="school">Acadia</option>
                 <option value="bank">Banking</option>
             </select>
-
-            <div class="cyber-actions">
-                <button type="button" id="lab-exploit-run">
-                    ▶ Run Exploit
-                </button>
-            </div>
-
-            <p id="lab-exploit-status" class="cyber-muted">
-                Idle. Sign in, then run.
-            </p>
-
-            <pre id="lab-exploit-output"
-                 aria-live="polite"
-                 style="max-height:300px;overflow:auto;
-                        white-space:pre-wrap;text-align:left;
-                        font-size:12px;line-height:1.55;
-                        margin:0;padding:12px;
-                        border-radius:10px;
-                        background:rgba(0,0,0,0.45);">[SYSTEM] Waiting for an exploit...</pre>
         </div>
-
-        <!-- Target selection -->
-        <div class="cyber-targets">
-            <button type="button"
-                    class="cyber-target active"
-                    data-lab-target="school">
-                <span>🎓</span>
-                <strong>School</strong>
-                <small>Student Portal</small>
-            </button>
-
-            <button type="button"
-                    class="cyber-target"
-                    data-lab-target="bank">
-                <span>🏦</span>
-                <strong>Banking</strong>
-                <small>Financial System</small>
-            </button>
-        </div>
-
-        <!-- Challenge selection -->
-        <div class="cyber-section-heading">
-            <h3>SELECT AN ATTACK</h3>
-            <span id="lab-challenge-count">0 MISSIONS</span>
-        </div>
-
-        <div id="lab-challenges" class="cyber-challenges"></div>
-
-        <!-- Selected mission -->
-        <div class="cyber-panel">
-            <span class="cyber-kicker">ACTIVE MISSION</span>
-            <h3 id="lab-mission-title">Select a challenge</h3>
-            <p id="lab-mission-description"></p>
-
-
-            <div class="cyber-mode-switch" hidden aria-hidden="true">
-                <button type="button"
-                        id="lab-vulnerable"
-                        class="active">
-                    Vulnerable
-                </button>
-                <button type="button"
-                        id="lab-protected">
-                    Protected
-                </button>
-            </div>
-
-            <p id="lab-mode-description" class="cyber-muted" hidden></p>
-        </div>
-
-        <!-- Fictional database records -->
-        <div class="cyber-panel" id="lab-record-panel">
-            <div class="cyber-section-heading">
-                <h3>03 / ATTACK SETUP</h3>
-                <button type="button" id="lab-refresh">
-                    ↻ Refresh
-                </button>
-            </div>
-
-            <div id="lab-records" class="cyber-records"></div>
-
-            <label class="cyber-label" for="lab-record">
-                Select fictional record
-            </label>
-            <select id="lab-record"></select>
-
-            <label class="cyber-label" for="lab-value">
-                New value (grade % or balance in cents)
-            </label>
-            <input id="lab-value" type="number" value="95">
-        </div>
-
-        <!-- Terminal and script editor -->
-        <div class="cyber-panel">
-            <div class="cyber-section-heading">
-                <h3>04 / ATTACK TERMINAL</h3>
-                <span class="cyber-terminal-dot">● READY</span>
-            </div>
-
-            <p id="lab-hint" class="cyber-muted"></p>
-            <div class="lab-terminal-tabs" role="group" aria-label="Command entry mode">
-              <button type="button" id="lab-generated-tab" class="active">⚙ Generated Script</button>
-              <button type="button" id="lab-manual-tab">⌨ Manual Code</button>
-            </div>
-            <p class="cyber-muted" id="lab-terminal-help">Generate a supported local simulator command, or switch to Manual Code to edit it.</p>
-
-            <textarea id="lab-editor"
-                      spellcheck="false"
-                      aria-label="Attack command editor"></textarea>
-
-            <div class="cyber-actions">
-                <button type="button" id="lab-guided">
-                    Generate Script
-                </button>
-                <button type="button" id="lab-run">
-                    ▶ Run Attack
-                </button>
-            </div>
-
-            <pre id="lab-output"
-                 aria-live="polite">[SYSTEM] Waiting for mission...</pre>
-        </div>
-
-        <!-- Access tests preserved for app.js -->
-        <div class="cyber-panel">
-            <h3>ACCESS TESTS</h3>
-            <div class="cyber-actions">
-                <button type="button" id="test-acadia-access">
-                    Test School
-                </button>
-                <button type="button" id="test-bank-access">
-                    Test Banking
-                </button>
-            </div>
-            <p id="attack-message" aria-live="polite"></p>
-        </div>
-
-        <!-- Attack history -->
-        <div class="cyber-panel">
-            <div class="cyber-section-heading">
-                <h3>07 / ATTACK HISTORY</h3>
-                <span>POSTGRESQL</span>
-            </div>
-
-            <div id="lab-events" class="cyber-events"></div>
-        </div>
-
-        <div class="cyber-panel" id="lab-scoped-recovery-panel">
-            <h3>08 / RESTORE ATTACK LAB CHANGES</h3>
-            <p class="cyber-muted">Undo tracked Attack Lab database and file changes only. Normal application activity is not reset.</p>
-            <p id="lab-scoped-recovery-status" aria-live="polite">Checking tracked changes...</p>
-            <button type="button" id="lab-restore-everything">↺ Restore Everything Changed by Attack Lab</button>
-        </div>
-
-        <p class="cyber-disclaimer">
-            Educational simulation only. All challenges use
-            fictional local data. No external systems are targeted.
-        </p>
-
     </div>
+
+    <div class="pt-actions">
+        <button type="button" id="lab-exploit-run">💥 Run SQL Injection</button>
+    </div>
+
+    <p class="pt-status" id="lab-exploit-status">Idle.</p>
+
+    <pre id="lab-exploit-output"
+         class="pt-terminal"
+         style="min-height:120px;max-height:30vh"
+         aria-live="polite">[idle] waiting for an exploit...</pre>
+
 </section>
 
         <!-- =====================================

@@ -40,7 +40,16 @@ const ORIGIN = BASE;
 
 // Free, no card required. This endpoint needs no credits.
 const LLM_BASE = process.env.AI_LLM_BASE || "https://integrate.api.nvidia.com/v1";
-const LLM_MODEL = process.env.AI_MODEL || "moonshotai/kimi-k3.1-pro";
+// Lightning: 30B MoE with 3B active parameters - answers a tool-calling turn in
+// well under a second on the free tier, unlike the reasoning model this lab
+// used before (about 26 s for a 16-token reply, which stalled real runs).
+const LLM_MODEL = process.env.AI_MODEL || "nvidia/nemotron-3.5-lightning-30b-a3b";
+
+// If the primary model errors or times out, try this one before failing the run.
+const MODEL_FALLBACK = [
+  LLM_MODEL,
+  process.env.AI_MODEL_FALLBACK || "nvidia/nemotron-3.5-bolt-e4b",
+].filter((model, index, all) => model && all.indexOf(model) === index);
 
 // The lab owner supplied this free NVIDIA key so the agent runs with no setup.
 // NVIDIA NIM's free tier needs no card. Override it any time with AI_LLM_KEY.
@@ -53,6 +62,20 @@ const LLM_KEY =
 const MAX_STEPS = Number(process.env.AI_MAX_STEPS || 16);
 const DEADLINE_MS = Number(process.env.AI_DEADLINE_MS || 600000);
 const REQUEST_TIMEOUT = 20000;
+
+// Which application this run covers. The terminal passes AI_TARGET so a run can
+// be scoped to the bank app, the school app, or both.
+const REQUESTED_TARGET = String(process.env.AI_TARGET || "both").toLowerCase();
+const TARGET = ["bank", "school"].includes(REQUESTED_TARGET)
+  ? REQUESTED_TARGET
+  : "both";
+const IN_SCOPE = TARGET === "both" ? ["bank", "school"] : [TARGET];
+
+// The caller reaches the terminal with an MFA-verified session already, so the
+// server passes that cookie down. Adopting it avoids a second TOTP login, which
+// would replay the same 30-second code and count against the auth rate limit.
+const REUSE_COOKIE = process.env.AI_SESSION_COOKIE || "";
+const REUSE_APP = process.env.AI_SESSION_APP || "";
 
 const ACCOUNTS = {
   bank: {
@@ -118,6 +141,16 @@ class Session {
     }
   }
 
+  // Load an existing cookie header, used to adopt the caller's session.
+  seed(cookieHeader) {
+    for (const part of String(cookieHeader).split(";")) {
+      const at = part.indexOf("=");
+      if (at > 0) {
+        this.cookies.set(part.slice(0, at).trim(), part.slice(at + 1).trim());
+      }
+    }
+  }
+
   async request(method, path, body) {
     const headers = { origin: ORIGIN };
     if (body !== undefined) headers["content-type"] = "application/json";
@@ -155,6 +188,26 @@ class Session {
 
 async function login(account) {
   const session = new Session(account.username);
+
+  // Fast path: adopt the caller's session when it is for this application.
+  // Verified with /api/auth/me so a stale or wrong cookie falls through to a
+  // real login rather than producing 401s for the rest of the run.
+  if (REUSE_COOKIE && REUSE_APP === account.app) {
+    session.seed(REUSE_COOKIE);
+
+    const me = await session.request("GET", "/api/auth/me");
+
+    if (
+      me.status === 200 &&
+      me.json?.authenticated === true &&
+      me.json?.app === account.app
+    ) {
+      console.log(`    reused the signed-in ${account.app} session`);
+      return session;
+    }
+
+    session.cookies.clear();
+  }
 
   const password = await session.request("POST", "/api/auth/login", {
     app: account.app,
@@ -280,7 +333,30 @@ const TOOLS = [
 
 // ---------------------- system prompt ----------------------
 
-const SYSTEM = `You are an autonomous web penetration tester. You have three tools: http_request, record_finding, finish.
+function buildSystem() {
+  const endpoints =
+    IN_SCOPE.map((app) =>
+      app === "bank"
+        ? `  bank:   /api/bank/accounts
+          /api/bank/payments
+          /api/bank/tuition/student/AC00000001
+          (student ids are sequential: AC + 8 digits)
+          Seeded id wordlist for this lab: AC00000034, AC00000035, AC00000036,
+          AC00000048, AC00000050, AC00000063. Start with these - they exist.`
+        : `  school: /api/school/enrollments
+          /api/school/services/summary
+          /api/school/admin/students`
+    ).join("\n");
+
+  const scope =
+    TARGET === "both"
+      ? `Two applications share this site.
+  app="bank"   -> endpoints under /api/bank/...
+  app="school" -> endpoints under /api/school/...`
+      : `This run covers ONE application only.
+  app="${TARGET}" -> endpoints under /api/${TARGET}/...`;
+
+  return `You are an autonomous web penetration tester. You have three tools: http_request, record_finding, finish.
 
 RULES
 - You are already authenticated. Do not test login again.
@@ -295,20 +371,10 @@ A 200 response that returns a name, balance or grade for an identifier you suppl
 vulnerability. A 404 means that id does not exist; a 403 means access control held.
 
 TARGET: ${BASE}
-Two applications share this site.
-  app="bank"   -> endpoints under /api/bank/...
-  app="school" -> endpoints under /api/school/...
+${scope}
 
 KNOWN ENDPOINTS (start here)
-  bank:   /api/bank/accounts
-          /api/bank/payments
-          /api/bank/tuition/student/AC00000001
-          (student ids are sequential: AC + 8 digits)
-          Seeded id wordlist for this lab: AC00000034, AC00000035, AC00000036,
-          AC00000048, AC00000050, AC00000063. Start with these - they exist.
-  school: /api/school/enrollments
-          /api/school/services/summary
-          /api/school/admin/students
+${endpoints}
 
 Look specifically for:
 1. BOLA/IDOR - reading data belonging to other users by changing an identifier.
@@ -316,12 +382,17 @@ Look specifically for:
 3. Leaked PII or balances in responses that the caller should not see.
 
 Work efficiently. Every tool call must teach you something.`;
+}
+
+const SYSTEM = buildSystem();
 
 // ---------------------- LLM call ----------------------
 
-async function callModel(messages) {
+let activeModel = LLM_MODEL;
+
+async function callModelOnce(model, messages) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 180000);
+  const timer = setTimeout(() => controller.abort(), 75000);
 
   try {
     const response = await fetch(`${LLM_BASE}/chat/completions`, {
@@ -331,7 +402,7 @@ async function callModel(messages) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: LLM_MODEL,
+        model,
         messages,
         tools: TOOLS,
         tool_choice: "auto",
@@ -351,6 +422,30 @@ async function callModel(messages) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Keeps the audit trail on a model that demonstrably answers, and records which
+// one produced the run so the report never names a model that was not used.
+async function callModel(messages) {
+  let lastError;
+
+  for (const model of MODEL_FALLBACK) {
+    try {
+      const message = await callModelOnce(model, messages);
+
+      if (model !== activeModel) {
+        console.log(`\n[i] switched to fallback model ${model}`);
+        activeModel = model;
+      }
+
+      return message;
+    } catch (error) {
+      lastError = error;
+      console.log(`\n[!] ${model}: ${error.message}`);
+    }
+  }
+
+  throw lastError;
 }
 
 // ---------------------- tool execution ----------------------
@@ -484,24 +579,21 @@ async function main() {
 
   mkdirSync(OUT_DIR, { recursive: true });
 
-  let bank;
-  let school;
+  const authenticated = {};
 
   try {
-    console.log("[*] Logging in as bank...");
-    bank = await login(ACCOUNTS.bank);
-    console.log("    OK");
-
-    console.log("[*] Logging in as school...");
-    school = await login(ACCOUNTS.school);
-    console.log("    OK");
+    for (const app of IN_SCOPE) {
+      console.log(`[*] Logging in as ${app}...`);
+      authenticated[app] = await login(ACCOUNTS[app]);
+      console.log("    OK");
+    }
   } catch (error) {
     console.error(`\n[!] Login failed: ${error.message}`);
     process.exitCode = 1;
     return;
   }
 
-  const sessions = { bank, school };
+  const sessions = authenticated;
   const messages = [
     { role: "system", content: SYSTEM },
     { role: "user", content: "Begin the assessment. Test the endpoints and record what you find." },
@@ -655,13 +747,16 @@ async function main() {
   lines.push("");
   lines.push(`**Target:** ${BASE}`);
   lines.push("");
-  lines.push(`**Model:** \`${LLM_MODEL}\` (free hosted endpoint, no paid credits)`);
+  lines.push(`**Scope:** ${TARGET === "both" ? "bank and school applications" : `${TARGET} application only`}`);
+  lines.push("");
+  lines.push(`**Model:** \`${activeModel}\` (free hosted endpoint, no paid credits)`);
   lines.push("");
   lines.push(`**Date:** ${new Date().toISOString()}`);
   lines.push("");
   lines.push("**Method:** an LLM agent was given three tools - send an authenticated request,");
-  lines.push("record a finding, finish - and drove the test itself. Both lab accounts were");
-  lines.push("signed in through the real password + TOTP flow before it started, so every");
+  lines.push("record a finding, finish - and drove the test itself. The account");
+  lines.push(`${IN_SCOPE.length === 1 ? "for the scoped application was" : "s for both applications were"} signed in`);
+  lines.push("through the real password + TOTP flow before it started, so every");
   lines.push("turn was spent attacking the application.");
   lines.push("");
   lines.push("**Disclosure:** as in a normal engagement, the agent was handed a starting list of");
@@ -765,7 +860,7 @@ async function main() {
   writeFileSync(
     jsonPath,
     JSON.stringify(
-      { target: BASE, model: LLM_MODEL, summary, findings, detected, trace },
+      { target: BASE, model: activeModel, summary, findings, detected, trace },
       null,
       2
     )
