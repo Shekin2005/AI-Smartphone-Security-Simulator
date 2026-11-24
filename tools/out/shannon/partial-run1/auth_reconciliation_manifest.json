@@ -1,0 +1,39 @@
+{
+  "session_id": "lab-shannon-mwuf1v8a",
+  "vulnerability_class": "auth",
+  "schema_version": 1,
+  "producer_queue": {
+    "path": "auth_exploitation_queue.json",
+    "blob_sha": "d2c68f2d30ec4e184482be842bcb13b3a85690e0"
+  },
+  "consumer_files": [
+    {
+      "path": "auth_exploitation_queue.json",
+      "sha256": "2c671af78966747c51a55f8ded0a2aa8c696f4925a7fd718cdcab8b2d4585cd9"
+    }
+  ],
+  "input_digests": [
+    {
+      "artifactKind": "producer-observations",
+      "sha256": "8a0d5e4a89f8ed5ba3a0556fe2639143880be55aab1083dfe01aa4c784156827"
+    },
+    {
+      "artifactKind": "supplemental-observations",
+      "sha256": "58575da5560f48cc71f1170f8f582fde2b546ca09c977e4511b9e86cd2ab5c04"
+    },
+    {
+      "artifactKind": "fixed-tasks",
+      "sha256": "73dad4d274767fa803fcca3e1052062c93a22ac546eff76304d12f1151e5fc23"
+    }
+  ],
+  "lineage": {
+    "AUTH-01": {
+      "primary": "AUTH-VULN-01",
+      "absorbed": []
+    },
+    "AUTH-02": {
+      "primary": "AUTH-VULN-02",
+      "absorbed": []
+    }
+  }
+}

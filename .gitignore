@@ -12,6 +12,5 @@ __pycache__/
 backups/
 *.bak-*
 
-# Shannon staging + reports written at scan time
+# Shannon's staging directory (a copy of the source tree)
 .shannon/
-tools/out/shannon/

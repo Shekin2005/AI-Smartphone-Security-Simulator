@@ -1,0 +1,35 @@
+{
+  "session_id": "lab-shannon-mwuf1v8a",
+  "vulnerability_class": "injection",
+  "schema_version": 1,
+  "producer_queue": {
+    "path": "injection_exploitation_queue.json",
+    "blob_sha": "e2fd6caf8d9702dfb2bd1ac7dd06c73297316550"
+  },
+  "consumer_files": [
+    {
+      "path": "injection_exploitation_queue.json",
+      "sha256": "109dd6df13cf4bdaa32b3e7f4110a8b7be38f06649645c1d9faec700543672ae"
+    }
+  ],
+  "input_digests": [
+    {
+      "artifactKind": "producer-observations",
+      "sha256": "1a79f81146553569f78efd78106c2869677f870776354439df790353bfc4eb39"
+    },
+    {
+      "artifactKind": "supplemental-observations",
+      "sha256": "882ba8ebc768670a19bc888615457f977abe6e73a3089420a5bc7b3a7eaaa967"
+    },
+    {
+      "artifactKind": "fixed-tasks",
+      "sha256": "6a40e4f29685639e00b965513df0ddb89ad8d2aa4d24c041dfff884172292d01"
+    }
+  ],
+  "lineage": {
+    "INJ-01": {
+      "primary": "INJ-VULN-01",
+      "absorbed": []
+    }
+  }
+}

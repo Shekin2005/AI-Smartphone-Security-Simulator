@@ -1,0 +1,30 @@
+{
+  "session_id": "lab-shannon-mwuf1v8a",
+  "vulnerability_class": "ssrf",
+  "schema_version": 1,
+  "producer_queue": {
+    "path": "ssrf_exploitation_queue.json",
+    "blob_sha": "88dc06c72d744be1ec986e228e7b80aa8e606c7f"
+  },
+  "consumer_files": [
+    {
+      "path": "ssrf_exploitation_queue.json",
+      "sha256": "166956cab53cab275153832d7b2a4c0055399618fa9494febf594cdf9b5fd9cb"
+    }
+  ],
+  "input_digests": [
+    {
+      "artifactKind": "producer-observations",
+      "sha256": "043e27c7ebaccff57bf29a5b23e86b8cbffde03916a46c5fad6052ce1b426819"
+    },
+    {
+      "artifactKind": "supplemental-observations",
+      "sha256": "787d8e786bd042ca574b3b9a7e4462d148b1cd3dcc4d923e6813e64a4500f854"
+    },
+    {
+      "artifactKind": "fixed-tasks",
+      "sha256": "9045bf749d99e9cd1294e8a037c34d8f0ed2a9b19c394697dd6622df8f7c010c"
+    }
+  ],
+  "lineage": {}
+}
