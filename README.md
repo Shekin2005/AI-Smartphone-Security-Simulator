@@ -327,6 +327,7 @@ PROJECT_GUIDE.md          Design notes
 
 | Document | Contents |
 | --- | --- |
+| `TERMINAL-COMMANDS.md` | Every command for both engines, what each one does, all 12 checks, all variables, and troubleshooting by exact message |
 | `tools/README-PENTEST.md` | How to run each engine, expected output, troubleshooting |
 | `DEPLOY-SELFHOST.md` | Single-host deployment, secrets, Caddy, tunnel |
 | `PROJECT_GUIDE.md` | Architecture and design decisions |
