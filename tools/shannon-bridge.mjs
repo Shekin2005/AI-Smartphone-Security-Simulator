@@ -66,6 +66,10 @@ const ALLOWED_HOSTS = new Set([
 
 const MAX_LINES = 4000;
 
+// Workspace names Shannon writes under ~/.shannon/workspaces. Only names in that
+// shape may be resumed, so a request cannot point the bridge at another path.
+const WORKSPACE_RE = /^lab-[A-Za-z0-9._-]{1,64}$/;
+
 // ---- state ---------------------------------------------------------------
 
 /** @type {{scanId:string|null,running:boolean,state:string,phase:string,url:string,
@@ -332,7 +336,7 @@ function buildScript({ url, workspace, profile }) {
   ].join("\n");
 }
 
-async function start({ url, profile }) {
+async function start({ url, profile, workspace }) {
   if (run.running) {
     return { ok: false, error: "A scan is already running", scanId: run.scanId };
   }
@@ -362,10 +366,17 @@ async function start({ url, profile }) {
   run.finishedAt = null;
   run.startedAt = Date.now();
   run.profile = profile;
-  run.workspace = `lab-${run.scanId}`;
+
+  // A named workspace resumes where an interrupted run stopped. Without it a
+  // bridge restart costs the whole scan, which is an hour of model time.
+  run.workspace = WORKSPACE_RE.test(String(workspace || ""))
+    ? String(workspace)
+    : `lab-${run.scanId}`;
+
   run.running = true;
 
   push(`[bridge] scan ${run.scanId}`);
+  push(`[bridge] workspace ${run.workspace}${workspace ? " (resume)" : ""}`);
   push(`[bridge] target ${url}`);
   push(`[bridge] model  ${MODEL} (${profile})`);
   push(`[bridge] staging a sanitised copy of the source tree...`);
@@ -559,7 +570,12 @@ const server = http.createServer(async (req, res) => {
       const profile = ["pipeline", "validate"].includes(body.profile)
         ? body.profile
         : "full";
-      return json(res, 200, await start({ url: target, profile }));
+
+      return json(res, 200, await start({
+        url: target,
+        profile,
+        workspace: String(body.workspace || "")
+      }));
     }
 
     if (url.pathname === "/status") {
