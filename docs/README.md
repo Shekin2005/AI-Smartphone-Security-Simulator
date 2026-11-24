@@ -1,12 +1,13 @@
-# Project report — two editions
+# Project report — editions
 
-Both editions describe the same assessment, from the same recorded run of
+All three editions describe the same assessment, from the same recorded run of
 24 November 2026. They differ in length, not in findings.
 
 | File | Pages | Use it for |
 | --- | --- | --- |
-| `AI-Smartphone-Security-Simulator-Report-Short.docx` | **8** | Submission where a page limit applies. Every finding, the engine comparison, all 36 references. |
-| `AI-Smartphone-Security-Simulator-Project-Report.docx` | 32 | The reference edition. Adds the background chapter, the source-code appendix, reproduction commands, the evidence inventory and a glossary. |
+| `AI-Smartphone-Security-Simulator-Full-Report.docx` | **24** | The primary submission. Adds the industry-evidence chapter (§3) — Big Sleep, MDASH, Anthropic, OpenAI Aardvark, XBOW, DARPA AIxCC, the ARTEMIS head-to-head and five surveys — plus a dedicated AI-vs-manual chapter (§7) and an AI tooling/cost appendix. 71 references. |
+| `AI-Smartphone-Security-Simulator-Report-Short.docx` | 8 | Submission where a strict page limit applies. Every finding, the engine comparison, 36 references. |
+| `AI-Smartphone-Security-Simulator-Project-Report.docx` | 32 | The earlier reference edition (pre-industry-evidence). Superseded by the full report; kept for its standalone source-code walkthrough. |
 
 Each has a matching `.pdf` exported from the `.docx`.
 
@@ -36,7 +37,7 @@ defects, the discussion, the threats to validity and the full reference list.
 Dropped: the background chapter (the references still support the claims in
 the text), the long source listings, the reproduction commands and the
 evidence inventory. If a marker asks how to reproduce a finding, the full
-edition's Appendix B has the commands and Appendix C lists every evidence file.
+edition's Appendix C has the commands and Appendix D lists every evidence file.
 
 ## Rebuilding
 
@@ -44,9 +45,10 @@ The documents are generated, so text corrections do not require touching the
 layout:
 
 ```bash
-python docs/build-project-docx-short.py     # 8-page edition
-python docs/build-project-docx.py           # full edition
-python docs/verify-docx.py docs/AI-Smartphone-Security-Simulator-Report-Short.docx
+python docs/build-project-docx-full.py      # 24-page primary edition (71 refs)
+python docs/build-project-docx-short.py     # 8-page edition (36 refs)
+python docs/build-project-docx.py           # 32-page legacy reference edition
+python docs/verify-docx.py docs/AI-Smartphone-Security-Simulator-Full-Report.docx
 ```
 
 `verify-docx.py` checks for unrendered markup, dangling citations and empty
@@ -59,7 +61,22 @@ page, since eight pages does not need one.
 ## Changing the citation style
 
 References are numbered (IEEE-style) and the numbering is generated from the
-`REFS` list in `docx_framework.py`, so an in-text citation cannot drift out of
-step with the list. For Harvard or APA, reorder or rewrite that list and change
-`c()` to emit `(Author, Year)` — the body text needs no edits beyond the
-citation call, because every citation goes through that one function.
+reference lists — `REFS` in `docx_framework.py` for the core sources, extended
+by `references_full.py` for the industry literature — so an in-text citation
+cannot drift out of step with the list. For Harvard or APA, reorder or rewrite
+those lists and change `c()` to emit `(Author, Year)` — the body text needs no
+edits beyond the citation call, because every citation goes through that one
+function.
+
+## What the full edition adds over the short one
+
+Section 3 is the industry-evidence chapter: what AI security testing has
+achieved in production (Google Big Sleep's SQLite 0-day, Microsoft MDASH's 16
+Windows CVEs via 100+ debating agents, Anthropic's 500+ validated
+high-severity findings, OpenAI Aardvark's 92% golden-repo recall, XBOW's #1
+HackerOne finish and 28-minutes-vs-40-hours benchmark, DARPA AIxCC's 54/70
+found and 43 patched), the head-to-head studies (ARTEMIS at ICLR 2026, Semgrep,
+CVE-Bench, the AD harness study), and six adoption/trust surveys — each with
+the method stated. Section 7 then reads the lab's own AI-vs-manual result
+against that evidence. Appendix B inventories every AI resource used with its
+cost, including the four failed runs and why each failed.
