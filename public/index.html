@@ -7,8 +7,9 @@
         content="width=device-width, initial-scale=1.0">
   <title>AI Smartphone Security Simulator</title>
   <link rel="stylesheet" href="./style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1220'/%3E%3Crect x='10' y='6' width='12' height='20' rx='3' fill='none' stroke='%2338e8d0' stroke-width='2'/%3E%3C/svg%3E">
 <script src="./app.js" defer></script>
-<script src="./attack-lab-ui.js?v=single-focus-final-20261114" defer></script>
+<script src="./attack-lab-pentest.js?v=manual-pentest-20261123" defer></script>
 <script src="./acadia-roles.js" defer></script>
 <script src="./school-upgrade.js" defer></script>
 <script src="./school-services.js" defer></script>
@@ -1081,6 +1082,57 @@
     </p>
 </div>
 
+
+        <!-- ==========================================
+             MANUAL PENTEST
+             Runs the deterministic suite (tools/
+             pentest-suite.mjs) against the live apps
+             and streams the result here.
+             ========================================== -->
+        <div class="cyber-panel" id="lab-pentest-panel">
+            <div class="cyber-section-heading">
+                <h3>01 / MANUAL PENTEST</h3>
+                <span>NO AI</span>
+            </div>
+
+            <p class="cyber-muted">
+                A fixed, repeatable test suite. It signs in with the lab
+                accounts, attacks both applications, and proves every
+                result with the actual HTTP request and response. No model
+                is involved, so the same run always gives the same answer.
+            </p>
+
+            <div class="cyber-actions">
+                <button type="button" id="lab-pentest-run">
+                    ▶ Run Manual Pentest
+                </button>
+                <button type="button" id="lab-pentest-clear">
+                    Clear
+                </button>
+            </div>
+
+            <p id="lab-pentest-status" class="cyber-muted">
+                Idle. Sign in to the lab, then run.
+            </p>
+
+            <pre id="lab-pentest-output"
+                 aria-live="polite"
+                 style="max-height:300px;overflow:auto;
+                        white-space:pre-wrap;text-align:left;
+                        font-size:12px;line-height:1.55;
+                        margin:0;padding:12px;
+                        border-radius:10px;
+                        background:rgba(0,0,0,0.45);">[SYSTEM] Waiting to run...</pre>
+
+            <p class="cyber-muted">
+                <a id="lab-pentest-report"
+                   href="/api/pentest/report"
+                   target="_blank"
+                   rel="noopener">
+                    View the generated report
+                </a>
+            </p>
+        </div>
 
         <!-- Target selection -->
         <div class="cyber-targets">

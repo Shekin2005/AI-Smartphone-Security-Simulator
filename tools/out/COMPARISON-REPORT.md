@@ -128,4 +128,4 @@ npm run ai                    # AI engine      -> AI-AGENT-FINDINGS.json
 node tools/compare-engines.mjs # this comparison
 ```
 
-Generated 2026-11-23T23:25:35.166Z.
+Generated 2026-11-23T23:51:18.217Z.

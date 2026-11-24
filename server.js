@@ -1729,6 +1729,133 @@ app.get("/api/ai-agent/report", (req, res) => {
 });
 
 // ==================================================
+// MANUAL PENTEST - runs tools/pentest-suite.mjs
+// ==================================================
+// The deterministic half of the project, exposed in the Attack Lab so it can be
+// run from the phone like the AI agent. It is the same script as
+// `npm run pentest`, so the console and the terminal agree.
+//
+// Output is streamed as Server-Sent Events. The suite takes about a minute
+// because it deliberately waits 31 seconds to measure how long the MFA
+// lockout lasts.
+app.get("/api/pentest/run", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({
+      error: "Sign in as a lab user before running the pentest"
+    });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  if (typeof res.flushHeaders === "function") {
+    res.flushHeaders();
+  }
+
+  const send = (event, payload) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  const root = path.dirname(fileURLToPath(import.meta.url));
+
+  // The public HTTPS URL rather than loopback: the session cookie is Secure, so
+  // Express will not issue it over plain HTTP and every login would fail.
+  const target =
+    process.env.PUBLIC_ORIGIN || "https://shekin.tail97139a.ts.net";
+
+  send("start", { target });
+
+  const child = spawn(
+    process.execPath,
+    [path.join(root, "tools", "pentest-suite.mjs")],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        PENTEST_BASE: target,
+        PENTEST_OUT_DIR: path.join(root, "tools", "out")
+      }
+    }
+  );
+
+  let pending = "";
+
+  const emit = chunk => {
+    pending += chunk.toString();
+
+    const parts = pending.split(/\r?\n/);
+    pending = parts.pop() ?? "";
+
+    for (const line of parts) {
+      if (line.trim()) {
+        send("log", { line });
+      }
+    }
+  };
+
+  child.stdout.on("data", emit);
+  child.stderr.on("data", emit);
+
+  // The suite normally finishes in about a minute. Cap it so a hung request
+  // cannot leave a node process running for the rest of the session.
+  const guard = setTimeout(() => {
+    if (child.exitCode === null && !child.killed) {
+      send("log", { line: "[!] Suite exceeded 5 minutes - stopping it." });
+      child.kill("SIGTERM");
+    }
+  }, 300000);
+
+  child.on("error", error => {
+    clearTimeout(guard);
+    send("done", { ok: false, error: error.message });
+    res.end();
+  });
+
+  child.on("close", code => {
+    clearTimeout(guard);
+
+    if (pending.trim()) {
+      send("log", { line: pending });
+    }
+
+    send("done", { ok: code === 0, code });
+    res.end();
+  });
+
+  req.on("close", () => {
+    clearTimeout(guard);
+
+    if (child.exitCode === null && !child.killed) {
+      child.kill("SIGTERM");
+    }
+  });
+});
+
+// Serves PENTEST-REPORT.md to the Attack Lab, mirroring the AI report route.
+app.get("/api/pentest/report", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Sign in first" });
+  }
+
+  const reportPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "tools",
+    "out",
+    "PENTEST-REPORT.md"
+  );
+
+  if (!existsSync(reportPath)) {
+    return res.status(404).json({
+      error: "No report yet - run the pentest first"
+    });
+  }
+
+  res.type("text/markdown").send(readFileSync(reportPath, "utf8"));
+});
+
+// ==================================================
 // 27. SERVE SMARTPHONE FRONTEND
 // ==================================================
 

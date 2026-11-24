@@ -715,8 +715,11 @@ function resetSecureScreens() {
     $("balance").textContent = "—";
     $("savings-balance").textContent = "—";
     $("transactions").replaceChildren();
-    $("bank-account-numbers").replaceChildren();
-    $("bank-link-output").replaceChildren();
+    // These two panels are optional: the Account Numbers / link-code UI is not
+    // present in every build. Guard them so a missing panel cannot abort the
+    // reset that runs on every sign-out.
+    $("bank-account-numbers")?.replaceChildren();
+    $("bank-link-output")?.replaceChildren();
     showBankPanel("transfer");
 
     [
@@ -1233,6 +1236,9 @@ document.querySelectorAll('[data-bank-panel]').forEach(button=>{
 
 async function loadBankAccountNumbers() {
     const output = $("bank-account-numbers");
+
+    if (!output) return;
+
     const status = document.createElement("li");
     status.textContent = "Loading account numbers...";
     output.replaceChildren(status);
@@ -1255,7 +1261,10 @@ async function loadBankAccountNumbers() {
     }
 }
 
-$("bank-generate-link").addEventListener("click", async event => {
+// Optional panel. Without this guard the whole file stopped executing here
+// and every binding below it - transfers, tuition lookup, contacts, messages,
+// camera and initializeSimulator() - was never registered.
+$("bank-generate-link")?.addEventListener("click", async event => {
     const button = event.currentTarget;
     const output = $("bank-link-output");
     const status = document.createTextNode("Generating verification code...");
