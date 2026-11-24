@@ -20,7 +20,7 @@ rather than asserted.
 | 🏦 **Banking** | Accounts, payments, tuition lookup. MFA-enforced. |
 | 🎓 **Acadia Student** | Enrollments, services, tuition summary. MFA-enforced. |
 | 🛡️ **AI Defender** | Streams an LLM agent that chooses its own attacks. |
-| ⚠️ **Attack Lab** | Runs the deterministic pentest and the mission exercises. |
+| ⚠️ **Attack Lab** | Runs a real SQL injection and the deterministic pentest. |
 
 Both applications are real Express routes with PostgreSQL-backed sessions,
 Argon2 password hashing, and TOTP second factors. They are intentionally
@@ -41,7 +41,7 @@ imperfect — that is what the pentest tooling exists to find.
               │    app     │  Node/Express
               │            │  · Banking + Acadia routes
               │            │  · AI Defender (spawns tools/ai-agent.mjs)
-              │            │  · Attack Lab  (spawns tools/pentest-suite.mjs)
+              │            │  · Attack Lab  (real SQLi + spawns tools/pentest-suite.mjs)
               └─────┬──────┘
                     │
               PostgreSQL
@@ -89,14 +89,36 @@ verified ground truth. All three run from the website **and** from a terminal.
 
 | Where | Button | Runs |
 | --- | --- | --- |
+| Attack Lab | **▶ Run Exploit** | `POST /api/lab/exploit/sqli` |
 | Attack Lab | **▶ Run Manual Pentest** | `tools/pentest-suite.mjs` |
 | AI Defender | **▶ Run AI Agent** | `tools/ai-agent.mjs` |
 
-Both stream live output into the panel and link to the generated report. Both
-require a signed-in, MFA-verified session because they spawn a process.
+All three stream live output into the panel and link to the generated report.
+All three require a signed-in, MFA-verified session.
 
-The manual run takes about a minute. The AI run takes about five, because the
-free hosted model needs roughly a minute per decision.
+The exploit runs in under a second. The manual run takes about a minute. The AI
+run takes about five, because the free hosted model needs roughly a minute per
+decision.
+
+### The real exploit
+
+**▶ Run Exploit** performs an actual SQL injection against the running
+database. The server does not simulate it and does not replay a recording: it
+runs two queries over the same data and shows you what each one returned.
+
+- one query binds the payload as a parameter
+- one query concatenates the payload into the statement
+
+With the default payload `' OR '1'='1` the parameterised query returns 0 rows
+and the concatenated query returns 2, including the `secret` column. Sending
+ordinary text such as `Training student A` returns 1 row from both queries and
+reports `exploited: false`, so the panel does not fire on legitimate input.
+
+The run is contained. The target rows are pinned by a `MATERIALIZED` CTE, the
+transaction is opened `READ ONLY`, input is capped at 64 characters, and the
+route requires an MFA-verified session, a consent row and
+`LAB_VULNERABLE_MODE=true`. Each run is written to `lab_incidents`, so the
+Attack history in the panel lists real events rather than sample data.
 
 ### From a terminal
 
@@ -181,16 +203,21 @@ A recording order that shows the whole argument in about eight minutes.
 3. Type `AC00000063` → **Lookup**. The panel answers with that student's name
    and balance — a record belonging to someone else. That is finding 1,
    demonstrated from the phone UI rather than from a terminal.
-4. **Attack Lab** → **▶ Run Manual Pentest**. About a minute, 12 checks,
+4. **Attack Lab** → **▶ Run Exploit**. Instant. Parameterised 0 rows, injected
+   2 rows, and the leaked rows printed with their secrets — a live injection
+   against the running database.
+5. **Attack Lab** → **▶ Run Manual Pentest**. About a minute, 12 checks,
    3 confirmed vulnerabilities, then the report link.
-5. **AI Defender** → **▶ Run AI Agent**. About five minutes: the model's own
+6. **AI Defender** → **▶ Run AI Agent**. About five minutes: the model's own
    requests stream past, and it writes its own report.
-6. In a terminal, `npm run compare` scores both against ground truth and
+7. In a terminal, `npm run compare` scores both against ground truth and
    writes `tools/out/COMPARISON-REPORT.md`.
 
-Step 3 and step 4 are the same weakness reached two ways: one by hand, one by
-script. Step 5 is the contrast — the agent finds the same weakness on its own,
-but misses the two that need a measurement over time.
+Step 3 and step 5 are the same weakness reached two ways: one by hand, one by
+script. Step 4 shows a different class of bug, the one with the largest blast
+radius, demonstrated directly. Step 6 is the contrast — the agent finds the
+broken access control on its own, but misses the two that need a measurement
+over time.
 
 ---
 
@@ -265,6 +292,7 @@ public/                   Phone UI and app front-ends
   app.js                  Phone navigation, lock screen, power
   ai-agent-panel.js       AI Defender run + stream
   attack-lab-pentest.js   Attack Lab run + stream
+  attack-lab-exploit.js   Attack Lab real SQL injection
 tools/
   pentest-suite.mjs       Deterministic pentest
   ai-agent.mjs            LLM-driven agent
@@ -292,7 +320,10 @@ PROJECT_GUIDE.md          Design notes
 
 ## Limitations
 
-- All probes are read-only. No write, delete, or state-changing exploitation.
+- Probes are read-only. The one state-changing write is the `lab_incidents`
+  row each run records for the history panel.
+- The SQL injection reads only. Its transaction is `READ ONLY`, its target
+  rows are pinned by a `MATERIALIZED` CTE, and it cannot reach another table.
 - No fuzzing beyond the targeted injection probes in the suite.
 - The AI agent runs on a free hosted model: ~1 minute per decision, and it does
   not always self-report findings. The harness therefore confirms findings
@@ -301,5 +332,7 @@ PROJECT_GUIDE.md          Design notes
 
 ---
 
-Educational simulation only. All data is fictional. No external systems are
-targeted.
+Educational simulation only. The accounts, balances and grades are invented.
+The attacks against them are real: the SQL injection executes on the local
+PostgreSQL instance and the confirmed weaknesses were found by running the
+suites, not authored as sample output. No external system is targeted.
