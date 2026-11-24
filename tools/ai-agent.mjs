@@ -35,7 +35,9 @@ const OUT_DIR = process.env.AI_OUT_DIR || join(HERE, "out");
 
 // ---------------------- configuration ----------------------
 
-const BASE = (process.env.AI_BASE || "https://shekin.tail97139a.ts.net").replace(/\/+$/, "");
+// Defaults to the local stack so a fresh clone needs no configuration.
+// Override with AI_BASE to scan a remote deployment.
+const BASE = (process.env.AI_BASE || "http://localhost").replace(/\/+$/, "");
 const ORIGIN = BASE;
 
 // Free, no card required. This endpoint needs no credits.

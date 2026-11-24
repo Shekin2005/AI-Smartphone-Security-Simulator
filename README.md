@@ -56,7 +56,38 @@ Caddy publishes a port.
 
 ## Quick start
 
-Requires Docker, and Node 20+ if you want to run the tools from a terminal.
+Requires Docker only. No configuration file, no manual database, no SQL:
+
+```bash
+git clone https://github.com/Shekin2005/AI-Smartphone-Security-Simulator.git
+cd AI-Smartphone-Security-Simulator
+docker compose up -d --build
+```
+
+Then open <http://localhost> and unlock the phone with `1234`.
+
+On first start the app waits for PostgreSQL, applies `schema.sql`, and seeds
+three accounts, printing their TOTP secrets once into the log
+(`docker compose logs app`):
+
+| Account | App | Username | Password | Role |
+| --- | --- | --- | --- | --- |
+| Bank scan account | bank | `scan-bank` | `ScanLab!2026pass` | bank_user |
+| School scan account | acadia | `scan-student` | `ScanLab!2026pass` | student |
+| School administrator | acadia | `professor` | `Acadia-Admin-2026!` | admin |
+
+The TOTP secrets are fixed and documented, not random, so the pentest tools
+work immediately: `OFLS6MD3GNEVKNRSHEYEW6DYLVIWSXRI` (bank),
+`NAWFGQ2TKBTW2PSUJVDSCKLTH5KG4ZLC` (school),
+`IYZUKTCLOFJCKQKVLVLHEQC3PFDWKMDQ` (administrator). Generate a current code
+with `node tools/totp-code.mjs <SECRET>`.
+
+To use your own database, secrets or hostname instead, copy
+`.env.stack.example` to `.env.stack`, edit it, and pass it with
+`docker compose --env-file .env.stack up -d --build`.
+
+Node 20+ is only needed to run the pentest tools from a terminal rather than
+from the UI.
 
 ```bash
 git clone https://github.com/Shekin2005/AI-Smartphone-Security-Simulator.git

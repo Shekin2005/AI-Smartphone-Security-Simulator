@@ -9,7 +9,12 @@
     "pentest": "node tools/pentest-suite.mjs",
     "ai": "node tools/ai-agent.mjs",
     "compare": "node tools/compare-engines.mjs",
-    "pentest:all": "node tools/pentest-suite.mjs && node tools/ai-agent.mjs && node tools/compare-engines.mjs"
+    "pentest:all": "node tools/pentest-suite.mjs && node tools/ai-agent.mjs && node tools/compare-engines.mjs",
+    "up": "docker compose up -d --build",
+    "down": "docker compose down",
+    "down:clean": "docker compose down -v",
+    "logs": "docker compose logs -f app",
+    "bootstrap": "node docker/bootstrap.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -23,6 +28,7 @@
     "express-session": "^1.19.0",
     "helmet": "^8.3.0",
     "pg": "^8.23.1",
+    "puppeteer-core": "^25.18.1",
     "qrcode": "^1.5.4",
     "speakeasy": "^2.0.0"
   }

@@ -73,6 +73,16 @@ COPY school-routes.js ./
 COPY school-services-routes.js ./
 COPY public ./public
 
+# Schema plus migrations, so a fresh database can be created inside the
+# container without copying files in by hand.
+COPY schema.sql ./
+COPY *.sql ./
+
+# Bootstrap: waits for the database, applies the schema, seeds the lab
+# accounts, then starts the server.
+COPY --chown=node:node docker ./docker
+RUN chmod +x ./docker/entrypoint.sh
+
 # The pentest tooling. Copied with node ownership because the agent writes
 # its report here and the process runs as the unprivileged node user.
 COPY --chown=node:node tools ./tools
@@ -87,5 +97,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=25s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/api/health" || exit 1
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker/entrypoint.sh"]
 CMD ["node", "server.js"]

@@ -1,31 +1,69 @@
 # ==================================================
 # FULL STACK - ONE HOST
 # ==================================================
-# Replaces Render completely. Runs two containers on a private
-# network:
+# Three containers on a private network:
 #
-#   caddy    -> public HTTPS, automatic certificates
-#   app      -> the simulator (Node/Express) + the AI pentest agent
+#   caddy  -> public HTTP, forwards to the app
+#   app    -> the simulator (Node/Express) + the pentest tooling
+#   db     -> PostgreSQL, created and seeded automatically
 #
-# The AI pentest agent runs inside the app container
-# (tools/ai-agent.mjs) and is started from the AI Defender panel, so
-# there is no separate scanner service and no Docker socket to mount.
+# The pentest tools run inside the app container (tools/ai-agent.mjs,
+# tools/pentest-suite.mjs) and are started from the UI, so there is no
+# separate scanner service and no Docker socket to mount.
 #
-# Usage:
-#   cp .env.stack.example .env.stack   # then fill it in
+# QUICK START (no configuration needed):
+#
+#   docker compose up -d --build
+#   open http://localhost
+#
+# The defaults below are development values. To use your own database,
+# secrets or hostname, copy .env.stack.example to .env.stack, edit it,
+# then run:
+#
 #   docker compose --env-file .env.stack up -d --build
-#
-# `--env-file` replaces Compose's automatic .env so your local
-# development .env is left untouched.
 # ==================================================
 
 services:
+  # --------------------------------------------------
+  # PostgreSQL
+  # --------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: ${DB_CONTAINER:-sim-db}
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smartphone}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartphone}
+      POSTGRES_DB: ${POSTGRES_DB:-smartphone_security}
+
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # On a brand-new volume Postgres runs this before accepting connections,
+      # so the tables exist before the app starts. The app also applies the
+      # same file on boot, which covers an existing volume where initdb has
+      # already run. Both are idempotent.
+      - ./schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartphone} -d ${POSTGRES_DB:-smartphone_security}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+    networks:
+      - web
+
+  # --------------------------------------------------
+  # Application
+  # --------------------------------------------------
   app:
     build:
       context: .
       dockerfile: Dockerfile
     image: ai-smartphone-app:1.0.0
-    container_name: sim-app
+    container_name: ${APP_CONTAINER:-sim-app}
     restart: unless-stopped
 
     environment:
@@ -33,46 +71,61 @@ services:
       PORT: "3000"
       HOST: 0.0.0.0
 
-      # Required
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env.stack}
-      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
-      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?set TOTP_ENCRYPTION_KEY}
+      # Points at the db service by default, so a fresh clone needs no setup.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://smartphone:smartphone@db:5432/smartphone_security}
 
-      # Exact public origin for the same-origin API guard.
+      # Development defaults. Replace both before exposing this to a network.
+      SESSION_SECRET: ${SESSION_SECRET:-dev-only-session-secret-change-before-use}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-8f4c2a1b9d7e6f3051a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708}
+
       # Must match the URL the browser uses, or every POST returns 403.
-      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN e.g. https://lab.example.com}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost}
 
-      # Optional lab flags
+      # Lab flags
       LAB_VULNERABLE_MODE: ${LAB_VULNERABLE_MODE:-true}
       LAB_RECOVERY_DATABASE_URL: ${LAB_RECOVERY_DATABASE_URL:-}
 
-      # Shannon runs on the host inside WSL2 (it needs Docker, and this container
-      # deliberately has no Docker socket). These let the app reach the small
-      # loopback bridge that drives it. Empty token = the button reports
-      # "bridge not configured" rather than failing mysteriously.
+      # Seeding runs only when the users table is empty, so this never
+      # overwrites accounts you created yourself.
+      SEED_DEMO_ACCOUNTS: ${SEED_DEMO_ACCOUNTS:-true}
+
+      # Shannon runs on the host in WSL2 (it needs Docker, which this container
+      # deliberately does not have). Empty token = the button reports
+      # "bridge not configured" instead of failing mysteriously.
       SHANNON_BRIDGE_TOKEN: ${SHANNON_BRIDGE_TOKEN:-}
       SHANNON_BRIDGE_PORT: ${SHANNON_BRIDGE_PORT:-7071}
+
+      # The AI Pentest agent. The image carries a free NVIDIA key so the agent
+      # works with no setup; set AI_LLM_KEY to use your own.
+      AI_LLM_KEY: ${AI_LLM_KEY:-}
+      AI_LLM_BASE: ${AI_LLM_BASE:-}
+      AI_MODEL: ${AI_MODEL:-}
+
+    depends_on:
+      db:
+        condition: service_healthy
 
     networks:
       - web
 
     # No published port: only Caddy can reach the app.
 
+  # --------------------------------------------------
+  # Reverse proxy
+  # --------------------------------------------------
   caddy:
     image: caddy:2-alpine
-    container_name: sim-caddy
+    container_name: ${CADDY_CONTAINER:-sim-caddy}
     restart: unless-stopped
 
     ports:
-      # Only 80. The 443 mapping was removed because Caddy serves HTTP on 80
-      # (SITE_ADDRESS=:80) and the public edge terminates TLS itself - first
-      # cloudflared, now Tailscale Funnel. Docker holding 443 stopped
-      # tailscaled from binding it for the funnel listener.
-      - "80:80"
+      # HTTP_PORT lets a second stack run beside an existing one.
+      - "${HTTP_PORT:-80}:80"
 
     environment:
-      # Caddy asks Let's Encrypt for this exact hostname.
-      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS e.g. lab.example.com}
+      # ":80" serves plain HTTP on any hostname, which is what a local run
+      # wants. Set a real domain to get automatic HTTPS.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
 
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -86,9 +139,9 @@ services:
       - web
 
 networks:
-  # public-facing side, reached by Caddy
   web:
 
 volumes:
+  db-data:
   caddy-data:
   caddy-config:
