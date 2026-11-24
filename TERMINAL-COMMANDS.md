@@ -668,3 +668,56 @@ lab@attack:~$ bash -c whoami
 
 Because the browser and this document use the same route, a command typed on the
 phone behaves exactly like the same command typed in a terminal.
+
+### 9.5 Why an HTTPS scan of the public hostname stops early
+
+This is the one result that looks like a broken install and is not. Typing the
+URL from the browser address bar:
+
+```
+lab@attack:~$ nikto -h https://shekin.tail97139a.ts.net/
+```
+
+produces two findings and then aborts:
+
+```
++ ERROR: *** Error limit (20) reached for host, giving up. Last error: opening stream: ssl connect failed. ***
++ ERROR: *** Consider using mitmproxy to avoid TLS fingerprinting. ***
++ Scan terminated: 20 errors and 2 items reported on the remote host
+```
+
+Measured cause. Inside the container the hostname does **not** resolve to the
+public funnel address; it resolves to the Tailscale interface:
+
+```
+$ docker exec sim-app getent hosts shekin.tail97139a.ts.net
+100.111.105.54  shekin.tail97139a.ts.net
+```
+
+So nikto scans down the tunnel, and the funnel accepts one request (0.23 s) but
+drops the hundreds of rapid TLS reconnects a scan makes. Nikto's own message
+about TLS fingerprinting is the tell: the handshake, not the tool, is being
+refused.
+
+Measured difference, same binary, same site:
+
+| Target | Requests | Errors | Time | Result |
+| --- | --- | --- | --- | --- |
+| `-h shekin.tail97139a.ts.net -p 443 -ssl` | 160 | 20 | 1 s | aborted |
+| `-h host.docker.internal -p 80` | **7,970** | **0** | 36 s | 3 findings |
+
+`host.docker.internal` reaches the same Caddy instance over the published port
+without leaving the host, so nothing is rate-limited. Use it:
+
+```bash
+nikto -h host.docker.internal -p 80
+```
+
+The terminal now translates the URL form into nikto's flags (`-h host -p port
+-ssl`) and prints the explanation above before the scan starts, so the output
+cannot be mistaken for a missing tool.
+
+One related detail: Caddy publishes **only port 80** in this stack, with
+Tailscale owning 443. `nikto -h https://host.docker.internal/` therefore resolves
+to port 443 and reports `[FAIL] Unable to connect` — correct, not a bug. The
+phone's HTTPS is terminated by Tailscale, not by the container.
