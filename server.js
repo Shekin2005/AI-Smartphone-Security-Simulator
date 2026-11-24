@@ -216,9 +216,28 @@ app.use("/api/auth", rateLimit({
   skipSuccessfulRequests: true,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  keyGenerator: req =>
-    `${ipKeyGenerator(req.ip)}|${String(req.body?.username ?? "").toLowerCase()}`
+  keyGenerator: req => {
+    // /api/auth/verify carries only the code, so there is no username to key on.
+    // Falling back to the address alone would put every user behind the proxy in
+    // one bucket, and 30 wrong codes by anyone would block MFA for everyone. The
+    // pending account is already on the session by then, so key on that.
+    const account =
+      String(req.body?.username ?? "").toLowerCase() ||
+      req.session?.pendingId ||
+      "anonymous";
+
+    return `${ipKeyGenerator(req.ip)}|${account}`;
+  }
 }));
+
+// Auth responses describe the current session, so no intermediary may store
+// them. Helmet does not set this, and /api/auth/* had no Cache-Control at all -
+// exactly the gap an authentication analysis flags, with low but real impact.
+app.use("/api/auth", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  next();
+});
 
 // ==================================================
 // 7. GENERAL HELPERS
