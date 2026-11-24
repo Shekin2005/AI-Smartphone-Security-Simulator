@@ -15,7 +15,7 @@ project's marketing.
 | Does it need a paid key? | **No** | validated and ran on the free NVIDIA NIM key, cost $0.0000 |
 | Did a real scan progress? | **Yes** | Pre-Recon, Recon, Vulnerability Analysis completed; exploitation agents ran |
 | How long is a full scan? | 1–1.5 hours (vendor figure) | the smoke run was still in exploitation at 165 s |
-| Is it a drop-in for the AI Pentest terminal? | **No** | needs Docker + a host-side bridge; see below |
+| Is it a drop-in for the AI Pentest terminal? | **No, but it is now an engine switch** | needs Docker + a host-side bridge; that bridge is shipped, see below |
 
 ## Why it cannot run inside the app container
 
@@ -147,23 +147,44 @@ reporting              pending
 The run was stopped on purpose with `stop --all`, so no report was produced and
 no cost was incurred.
 
-## Why this is not wired into the AI Pentest terminal
+## How it is wired into the phone UI
 
-A working bridge is possible — Windows Node holding a small HTTP service that
-shells `wsl.exe -e bash -lc "npx @keygraph/shannon ..."`, with the app calling
-`http://host.docker.internal:<port>`. Two measured facts shaped the decision not
-to ship that before submission:
+The bridge is shipped. `tools/shannon-bridge.mjs` runs on Windows, listens on
+`127.0.0.1:7071`, requires an `x-bridge-token` header, and drives `wsl.exe`.
+`server.js` adds six session-gated proxy routes — `/api/shannon/health`,
+`start`, `status`, `logs`, `stop`, `report` — and the AI Pentest screen has an
+engine switch that swaps the in-container agent for Shannon without leaving the
+page.
+
+Two measured facts shaped that design:
 
 1. **WSL background processes do not survive the session.** A test listener
    started with `nohup ... &` inside `wsl -e bash -lc` was gone immediately
-   afterwards (`port 7071 NOT listening`). The bridge would therefore have to be
-   a persistent Windows service, not a convenience script.
+   afterwards (`port 7071 NOT listening`). The bridge is therefore a long-lived
+   Windows process started once per session, not a per-scan script.
 2. **A full run is 1–1.5 hours**, against a terminal whose SSE stream caps at
-   three minutes per command.
+   three minutes per command. So Shannon is polled (`start` → `status` → `logs`)
+   rather than streamed, and the in-container agent stays as the fast path that
+   needs no WSL2, no Docker socket and no bridge.
 
-So the honest architecture is: Shannon runs on the host as an **optional
-external engine**, and the phone's AI Pentest terminal keeps the in-container
-agent that runs anywhere, needs no WSL2, no Docker socket and no bridge.
+## Credentials are a config file, not a guess
+
+`configs/shannon-lab.yaml` names the provisioned scan account, its password and
+its TOTP secret, and describes the login flow. The bridge passes it with `-c`.
+
+Without it the exploit agents had to invent their own way in. Measured on
+2026-11-24: `authz-exploit` registered throwaway accounts that could not
+complete MFA enrolment, then slept in 180 s and 600 s retries; the run reached
+93 minutes in the exploitation phase and was stopped with no report. The phase
+that never finished was the one that needed a signed-in bank session.
+
+The page they sign in through is `/lab-login.html`: a plain form over the same
+`/api/auth/login` and `/api/auth/verify` endpoints the phone UI uses, so the
+test engine does not have to drive the phone shell — power button, PIN pad, app
+tile — before it can reach an API. Its behaviour lives in `public/lab-login.js`
+because Helmet sends `script-src 'self'`: an inline `<script>` is blocked
+silently and the form falls back to a native GET submit, which looks exactly
+like a rejected login.
 
 ## Licensing note
 
@@ -173,18 +194,10 @@ the Corresponding Source to that service's users. This repository is public, so
 that requirement is easy to satisfy — but do not vendor Shannon into the app and
 then describe it as if it were the project's own engine.
 
-## If you still want it in the phone UI
-
-The minimum viable integration:
-
-1. `tools/shannon-bridge.mjs` on Windows, listening on `127.0.0.1:7071`, with
-   endpoints `POST /start`, `GET /status`, `GET /logs`, `POST /stop`.
-2. Start it once per session (or as a Scheduled Task) so it survives.
-3. Add `GET /api/ai-agent/shannon/*` in `server.js` that proxies to
-   `http://host.docker.internal:7071` after the same session check the other
-   tool routes use.
-4. Point the AI Pentest screen at those routes, and download Shannon's
-   `deliverables` directory when the workspace reports `completed`.
+## What a run costs
 
 Budget an hour per scan, and expect a 30B free model to produce a weaker
-pentest than the frontier models Shannon is tuned for.
+pentest than the frontier models Shannon is tuned for. The bridge stages a
+sanitised copy of the repository (`.env*`, `node_modules`, `.git`, `backups`
+and `tools/out` excluded) into `.shannon-target`, so a scan never reads its own
+output and never sees a secret.
