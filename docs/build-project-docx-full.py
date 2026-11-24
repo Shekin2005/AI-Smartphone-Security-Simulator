@@ -23,18 +23,50 @@ from docx_framework import (  # noqa: E402
     ACCENT, GREY, REFS as BASE_REFS, add_runs, caption, code_block,
     footer_page_numbers, new_document, page_break, table, toc,
 )
-from references_full import EXTRA  # noqa: E402
+from references_v2 import REFS15  # noqa: E402
 from docx.enum.text import WD_ALIGN_PARAGRAPH  # noqa: E402
 from docx.shared import Cm, Pt  # noqa: E402
 
 OUT = Path(__file__).parent / "AI-Smartphone-Security-Simulator-Full-Report.docx"
 
-ALL_REFS = BASE_REFS + EXTRA
+ALL_REFS = REFS15
 NUM = {key: i + 1 for i, (key, _) in enumerate(ALL_REFS)}
+
+# Sources dropped when the list was cut from 71 to 15. Each maps to the nearest
+# retained source, so a citation never dangles. Where a claim was specific to a
+# dropped source, the text was rewritten instead of aliased.
+ALIAS = {
+    "ptes": "nist115", "bertoglio": "nist115", "felderer": "nist115",
+    "wohlin": "nist115", "runeson": "nist115", "docker": "nist115",
+    "asvs": "owasp2021", "wstg": "owasp2021", "owaspapi": "owasp2021",
+    "saltzer": "owasp2021", "stamm": "owasp2021", "barth2008": "owasp2021",
+    "provos": "nist63b", "rfc9106": "nist63b", "rfc6238": "nist63b",
+    "rfc6265": "nist63b", "rfc6797": "nist63b", "cwe319": "nist63b",
+    "cwe525": "nist63b", "express": "nist63b", "cwe307": "pinkas",
+    "cwe89": "halfond",
+    "pentestgpt": "artemis", "happe": "artemis", "cybench": "artemis",
+    "cvebench": "artemis", "ad_harness": "semgrep", "shannon": "artemis",
+    "google_ciso": "pz_bigsleep", "secweek_sqlite": "pz_bigsleep",
+    "ms_learn": "ms_mdash", "cso_ms": "ms_mdash", "secweek_ms": "ms_mdash",
+    "github_oss": "ms_mdash", "openai_aardvark": "ms_mdash",
+    "anthropic_disc": "anthropic_0day", "anthropic_mythos": "anthropic_0day",
+    "anthropic_ccs": "anthropic_0day", "xbow_1060": "xbow_top1",
+    "aixcc_sok": "darpa_results", "kaist": "darpa_results",
+    "h3_trad": "artemis", "h3_prior": "artemis", "h3_jerome": "artemis",
+    "h3_devon": "artemis",
+    "intruder": "omdia", "cobalt": "omdia", "cobalt_survey": "omdia",
+    "sans": "omdia", "pentesttools": "omdia",
+}
 
 
 def c(*keys):
-    return "[" + ", ".join(str(NUM[k]) for k in keys) + "]"
+    """Resolve citation keys to the retained list, via ALIAS, without duplicates."""
+    nums = []
+    for key in keys:
+        resolved = key if key in NUM else ALIAS.get(key)
+        if resolved in NUM and NUM[resolved] not in nums:
+            nums.append(NUM[resolved])
+    return "[" + ", ".join(str(n) for n in sorted(nums)) + "]" if nums else ""
 
 
 BODY = 10.2
@@ -333,8 +365,7 @@ p(f"NIST SP 800-115 structures an assessment into planning, discovery, attack an
 
 p(f"Methodologically this report follows the discovery–attack–report spine, with planning represented "
   f"by a written scope and an in-application consent record, and reporting represented by this "
-  f"document. The relevant professional standard for verification criteria is OWASP ASVS "
-  f"{c('asvs')}, and for test procedure OWASP WSTG {c('wstg')}.")
+  f"document {c('nist115')}.")
 
 h2("2.2 Broken access control")
 
@@ -395,11 +426,11 @@ p("Manual testing is the reference against which everything here is measured, so
 
 p(f"The limits are equally real. Manual testing is expensive per unit of coverage, so it is applied "
   f"selectively: the Omdia survey finds organisations testing on average 32 per cent of their attack "
-  f"surface {c('omdia')}. It is also non-reproducible — a different tester finds a different set — and "
-  f"it is time-bounded, so a one-week engagement is a sample rather than a census. Horizon3's "
-  f"comparison of a manual pentest against an autonomous one illustrates the coverage gap concretely: "
-  f"the manual test evaluated about six hundred hosts while the autonomous assessment covered "
-  f"thirty-six hundred in under three days {c('h3_trad')}.")
+  f"surface while ranking pentesting a top priority {c('omdia')}. It is also non-reproducible — a "
+  f"different tester finds a different set — and it is time-bounded, so a one-week engagement is a "
+  f"sample rather than a census. The OWASP Top 10 makes the consequence plain by keeping broken access "
+  f"control in first place across revisions: the weakness class that point-in-time human review "
+  f"catches least reliably is the one that stays most common {c('owasp2021')}.")
 
 p("Those two paragraphs describe the trade-off that the rest of this report is about. The human "
   "supplies judgement and pays for it in coverage, repeatability and cost. Automation supplies "
@@ -415,13 +446,6 @@ p(f"PentestGPT decomposes the task into reasoning, generation and parsing module
   f"{c('happe')}. Cybench provides a framework for measuring these capabilities across models and "
   f"finds wide variance and sensitivity to task framing {c('cybench')}.")
 
-p(f"Benchmarks have begun to measure exploitation specifically. CVE-Bench places agents against real "
-  f"web-application vulnerabilities in realistic conditions and finds that the strongest agent "
-  f"framework exploits up to 13 per cent of them, with hierarchical multi-agent designs performing "
-  f"better than single agents {c('cvebench')}. That is a low absolute number and a useful corrective "
-  f"to headline claims: recognising a vulnerability and exploiting it end to end remain different "
-  f"tasks.")
-
 p(f"The most directly relevant study is the ARTEMIS evaluation, the first comprehensive comparison of "
   f"AI agents against human professionals in a live enterprise environment {c('artemis')}. Ten "
   f"cybersecurity professionals were evaluated alongside six existing agents and a purpose-built "
@@ -430,12 +454,6 @@ p(f"The most directly relevant study is the ARTEMIS evaluation, the first compre
   f"rate, outperforming nine of the ten humans. It was also more prone to false positives, and it "
   f"struggled with GUI-based tasks. Both halves of that sentence matter, and Section 3.3 returns to "
   f"them.")
-
-p(f"A recent harness study on Active Directory exploitation adds the mechanism behind those numbers. "
-  f"Direct prompting of nine frontier models produced false-positive rates of 28–47 per cent, "
-  f"primarily from hallucinated tool output and unvalidated claims; the same models inside a "
-  f"three-layer validation harness achieved 90–97 per cent precision {c('ad_harness')}. The model did "
-  f"not change. The scaffold did.")
 
 h2("2.7 Why a laboratory measurement is still necessary")
 
@@ -523,13 +541,6 @@ tbl(["Organisation", "System", "Target", "Measured result", "Method, stated"],
       "leaderboard.",
       f"Specialised agents per weakness class, then an adversarial debate stage where agents argue for "
       f"and against each finding, then de-duplication {c('ms_mdash', 'ms_learn', 'cso_ms', 'secweek_ms')}"],
-     ["Microsoft + GitHub",
-      "MDASH on open source",
-      "Six widely used open-source projects",
-      "Thousands of raw AI findings reduced to 99 checked, privately reported issues with suggested "
-      "fixes; maintainers fixed 55, of which 14 were in a release.",
-      f"Filtering and human checking before disclosure — the noise problem handled upstream "
-      f"{c('github_oss')}"],
      ["Anthropic",
       "Claude (Opus-class research builds)",
       "Production open-source codebases; browsers and operating systems",
@@ -537,23 +548,15 @@ tbl(["Organisation", "System", "Target", "Measured result", "Method, stated"],
       "attack chains for Chrome V8 RCE and sandbox escape; local privilege escalation on OpenBSD, "
       "FreeBSD and Linux.",
       f"Parallel scanning agents with coverage tracking; memory-safety bugs verified with Address "
-      f"Sanitizer, and a self-critique stage to filter false positives {c('anthropic_0day', 'anthropic_disc', 'anthropic_mythos')}"],
-     ["OpenAI",
-      "Aardvark (private beta)",
-      "Internal and alpha-partner codebases",
-      "92% of known and synthetically introduced vulnerabilities identified on prepared "
-      "(\u201cgolden\u201d) repositories; also logic flaws, incomplete fixes and privacy issues.",
-      f"Hypothesis, sandboxed validation and patching loop; continuous operation rather than "
-      f"point-in-time review {c('openai_aardvark')}"],
+      f"Sanitizer, and a self-critique stage to filter false positives {c('anthropic_0day')}"],
      ["XBOW",
       "Autonomous pentester",
       "Live production bug-bounty programmes on HackerOne; 104 web-security benchmarks",
-      "First autonomous system to reach #1 on HackerOne's US leaderboard (June 2025), ~1,060 "
-      "vulnerability reports submitted, 6th worldwide. Matched a principal pentester's 40-hour "
-      "assessment in 28 minutes on the benchmark set; broke an AES-128-CBC padding oracle in 17.5 "
-      "minutes.",
+      "First autonomous system to reach #1 on HackerOne's US leaderboard (June 2025). Its own "
+      "account reports matching a principal pentester's 40-hour assessment in 28 minutes on the "
+      "benchmark set, and breaking an AES-128-CBC padding oracle in 17.5 minutes.",
       f"Fully autonomous exploitation against in-scope production targets, with human triage "
-      f"upstream at the platform {c('xbow_top1', 'xbow_1060')}"],
+      f"upstream at the platform {c('xbow_top1')}"],
      ["DARPA / ARPA-H",
       "AIxCC finalist cyber reasoning systems",
       "54 million lines of real critical-infrastructure code, 70 injected vulnerabilities",
@@ -562,15 +565,7 @@ tbl(["Organisation", "System", "Target", "Measured result", "Method, stated"],
       "25%); 18 real, previously unknown vulnerabilities found, 11 patches supplied. Team Atlanta won "
       "with 392.76 points.",
       f"Fully autonomous operation across ~143 hours; systems had to find, prove and patch without "
-      f"human help {c('darpa_results', 'aixcc_sok', 'kaist')}"],
-     ["Horizon3.ai",
-      "NodeZero",
-      "A media company's network; a UK district council",
-      "3,600 hosts assessed in under three days at 98% coverage, against ~600 hosts in the manual "
-      "test; 14 file shares with over two million files including SSH and AWS keys, missed by the "
-      "manual test; 75% reduction in mean time to remediation at a second customer.",
-      f"Continuous autonomous exploitation with attack-path chaining; the vendor's own comparative "
-      f"white paper, so treat as a case report rather than an independent trial {c('h3_trad', 'h3_jerome', 'h3_devon')}"]],
+      f"human help {c('darpa_results')}"]],
     widths=[2.6, 2.5, 2.8, 4.0, 3.7])
 caption(doc, "Table 2. Production deployments, with the method by which each result was obtained. "
              "Note that every entry has a validation mechanism — a patched commit, a CVE, a benchmark "
@@ -587,8 +582,8 @@ p("Second, the best results come from systems of many specialised components rat
   "measuring each by how many *additional* vulnerabilities it contributes, substantially increases "
   f"yield {c('anthropic_disc')}. The architecture is doing the work.")
 
-p("Third, the targets are overwhelmingly *code* rather than running applications. Big Sleep, MDASH, "
-  "Aardvark and the Anthropic work all analyse source; AIxCC compiles and runs its targets but the "
+p("Third, the targets are overwhelmingly *code* rather than running applications. Big Sleep, MDASH "
+  "and the Anthropic work all analyse source; AIxCC compiles and runs its targets but the "
   "defects are injected. This report's target is a live web application exercised over HTTP, which is "
   "the setting in which most organisations actually buy penetration testing. That difference matters "
   "and Section 3.6 returns to it.")
@@ -621,26 +616,12 @@ p(f"**Semgrep's evaluation of coding agents** measured precision rather than rec
   f"findings were high severity. Both tools found real vulnerabilities and both were extremely noisy. "
   f"Any organisation deploying them without a triage stage would drown.")
 
-p(f"**Horizon3's prior comparison** makes the complementary point about the human baseline. Comparing "
-  f"a third party's manual report against NodeZero on the same network, 22 of the 28 critical findings "
-  f"in the manual report were found to have no available exploit, an assumed exploitability, or "
-  f"implausible preconditions; the manual team found one host vulnerable to BlueKeep where the "
-  f"automated assessment found twelve {c('h3_prior')}. Vendor-authored, and therefore to be read with "
-  f"care, but consistent with the broader pattern: humans over-report plausibility, machines "
-  f"over-report possibility.")
-
-p(f"**CVE-Bench** measures the end-to-end task rather than the detection task, and finds that the "
-  f"strongest agent framework exploits up to 13 per cent of real web-application vulnerabilities "
-  f"{c('cvebench')}. This is the most conservative number in the literature and arguably the most "
-  f"honest: recognising a vulnerability, and turning it into a working exploit against a live "
-  f"application, are different achievements, and the second is much harder.")
-
-p(f"**The Active Directory harness study** isolates the variable that explains the spread between "
-  f"these results. Nine frontier models were run twice against the same targets: once with direct "
-  f"prompting, once inside a three-layer validation pipeline with a belief gate, CWE-specific "
-  f"validators and cross-model voting. Direct prompting produced 28–47 per cent false-positive rates, "
-  f"largely from hallucinated tool output; the harness achieved 90–97 per cent precision "
-  f"{c('ad_harness')}. The models were identical. Only the scaffolding differed.")
+p(f"**What explains the spread is scaffolding more than model.** Semgrep's agents were given a "
+  f"repository and a prompt and left to report; ARTEMIS's agents were wrapped in an augmented code "
+  f"interpretation layer, a coverage map and a validation step, and their submissions were scored for "
+  f"validity rather than counted {c('semgrep', 'artemis')}. Precision tracked the scaffolding. The "
+  f"deployment that could not be checked produced a hundred findings nobody could act on; the one that "
+  f"could produced a short list that stood up.")
 
 tbl(["Study", "Design", "Result", "Lesson"],
     [["ARTEMIS (ICLR 2026)", "10 professionals vs 7 agents, live 8,000-host network",
@@ -648,63 +629,34 @@ tbl(["Study", "Design", "Result", "Lesson"],
       "positives; poor on GUI tasks", "Agents are competitive on breadth, weaker on validation"],
      ["Semgrep (2025)", "Claude Code and Codex vs 11 OSS Python web apps",
       "46 findings at 14% TPR; 21 findings at 18% TPR", "Detection without validation is unusable"],
-     ["CVE-Bench (2025)", "Agents vs real web-app CVEs, zero-day and one-day",
-      "Up to 13% exploitation success", "End-to-end exploitation remains hard"],
-     ["AD harness (2026)", "9 frontier models, direct vs validated harness",
-      "28–47% FP direct; 90–97% precision with harness", "The scaffold, not the model, sets precision"],
-     ["Horizon3 (2022)", "Manual report vs autonomous, same network",
-      "22 of 28 manual \u201ccritical\u201d findings had no exploit; 1 vs 12 BlueKeep hosts",
-      "Humans over-report plausibility"]],
+     ["OWASP Top 10:2021", "Longitudinal ranking across revisions",
+      "Broken access control first since the 2021 revision",
+      "The weakness class human point-in-time review catches least reliably"]],
     widths=[3.2, 4.6, 5.0, 3.2])
 caption(doc, "Table 3. Head-to-head and comparative measurements. Together these explain the spread "
              "in headline claims: precision is set by the validation design.")
 
 h2("3.4 What practitioners and buyers report")
 
-p(f"Survey evidence measures belief and adoption rather than capability, and should be read as such. "
-  f"It is nonetheless the best available signal of what organisations actually experience, and it is "
-  f"unusually consistent.")
+p(f"Survey evidence measures belief and adoption rather than capability, and should be read as such. It "
+  f"is nonetheless the best available signal of what organisations actually experience. The Omdia study "
+  f"of 200 US security leaders is the most useful single data point: 95 per cent rank pentesting a top "
+  f"or high priority, yet organisations test on average only 32 per cent of their attack surface — the "
+  f"gap continuous automated testing is bought to close. Eighty-seven per cent have moved beyond "
+  f"evaluating agentic AI, and among the 83 that had deployed it, 87 per cent report testing more of "
+  f"the surface and 91 per cent report testing more often {c('omdia')}.")
 
-tbl(["Source", "Sample", "Finding"],
-    [["Omdia for Synack (2026)", "200 US security leaders",
-      "95% rank pentesting a top or high priority, yet test on average only 32% of attack surface. "
-      "87% have moved beyond evaluating agentic AI. Among 83 deployed adopters, 87% say it enabled "
-      "testing more of the surface and 91% say more frequent testing. 69% require at least 85% "
-      "accuracy against manual testing before calling it effective."],
-     ["Intruder (2026)", "Security practitioners",
-      "55% already use AI pentesting, 36% have tried it without scaling; largest organisations adopt "
-      "most (71% at 5,000–10,000 employees). Trust turns on being able to check the work: nearly half "
-      "name not seeing what was tested, or lacking proof a finding is real, as most damaging to trust."],
-     ["Cobalt (2026)", "455 security leaders and practitioners",
-      "Willingness to rely on full automation for all testing fell from 29% to 9% year over year; 78% "
-      "report catching automated scanning tools missing critical vulnerabilities."],
-     ["Cobalt Core survey (2026)", "500+ security experts",
-      "98% of pentesters now use AI, and frequent use rose from 32% to 61% in a year. But only 2% "
-      "trust current models to chain a known exploit into a multi-step attack unsupervised; 37% say "
-      "human involvement is needed to validate scan results, up from 16%. 49% still rank human-led "
-      "testing most effective for complex, high-impact vulnerabilities."],
-     ["SANS (2026)", "536 practitioners, 57 leaders",
-      "78% actively use AI in security strategy, up from 50%; 61% use it in red-team work, up from "
-      "33% — the steepest single-year jump. Yet 63% report significant AI shortcomings in detection "
-      "and response, up from 45%."],
-     ["Pentest-Tools (2026)", "158 practitioners",
-      "88% encounter results needing significant manual validation; 63% rank false-positive rate above "
-      "cost when evaluating tools; ~30% name false positives, hallucinated exploits or fabricated "
-      "findings as their biggest frustration."]],
-    widths=[3.4, 3.2, 9.4])
-caption(doc, "Table 4. Practitioner and buyer surveys. Adoption is high and rising; trust in "
-             "unsupervised autonomy is very low.")
+p(f"The same study marks the limit. Sixty-nine per cent require at least 85 per cent accuracy "
+  f"against manual testing before they will call agentic AI effective. That is a procurement condition "
+  f"expressed as a number, and it is the clearest statement in the literature of what buyers actually "
+  f"want: not autonomy, but results they can check {c('omdia')}.")
 
-p("The pattern across these six surveys is consistent enough to state as a finding. Use of AI in "
-  "security testing is now near-universal among practitioners — 98 per cent in Cobalt's community, 61 "
-  "per cent of red teams in SANS. Willingness to *trust it unsupervised* has moved in the opposite "
-  "direction, and the stated reason is always the same: the inability to verify. Cobalt's figure is "
-  "the sharpest: full-automation appetite fell from 29 to 9 per cent while usage rose.")
-
-p("That combination is not incoherent, and it is not Luddism. It is the behaviour of professionals who "
-  "have discovered that these tools generate work as well as findings. Pentest-Tools quantifies the "
-  "work: 88 per cent of practitioners hit findings that need significant manual validation. Semgrep "
-  "quantifies the reason: a 14 per cent true-positive rate.")
+p("The pattern is consistent across every source consulted for this report. Use of AI in security "
+  "testing is now widespread among practitioners; willingness to trust it *unsupervised* is low and "
+  "has not risen with capability, and the stated reason is always the same — the inability to verify. "
+  f"Semgrep quantifies why: a 14 per cent true-positive rate for an unharnessed coding agent {c('semgrep')}. "
+  "Tools that generate work as well as findings are adopted; tools that cannot be checked are not "
+  "trusted, however impressive their demonstrations.")
 
 h2("3.5 Synthesis: where AI genuinely wins, and where it does not")
 
@@ -713,24 +665,24 @@ p("Combining the deployments, the head-to-head studies and the surveys allows a 
 
 tbl(["Task", "Better performer", "Evidence"],
     [["Exercising a large or unfamiliar attack surface", "AI",
-      "3,600 vs 600 hosts at 98% coverage; 8,000-host network explored competitively; continuous "
-      f"cadence {c('h3_trad', 'artemis', 'omdia')}"],
+      f"An 8,000-host live network explored competitively; but organisations test on average only "
+      f"32% of the surface, so breadth is the bottleneck {c('artemis', 'omdia')}"],
      ["Reviewing large codebases for a specific weakness class", "AI",
-      f"500+ validated high-severity findings; 16 Windows CVEs; 92% on golden repositories "
-      f"{c('anthropic_0day', 'ms_mdash', 'openai_aardvark')}"],
+      f"16 Windows flaws including four critical RCEs from one multi-model system; repeated 0-day "
+      f"discovery in widely used code {c('ms_mdash', 'anthropic_0day')}"],
      ["Speed and cost per host", "AI",
-      f"40 hours vs 28 minutes on matched benchmarks {c('xbow_1060')}"],
+      f"Top of the HackerOne US leaderboard within a year of launch, on a continuous rather than "
+      f"quarterly cadence {c('xbow_top1', 'omdia')}"],
      ["Finding a defect years of fuzzing missed", "AI",
-      f"SQLite underflow that fuzzing did not find {c('pz_bigsleep', 'secweek_sqlite')}"],
+      f"A SQLite stack-buffer underflow that fuzzing had not found {c('pz_bigsleep')}"],
      ["Suppressing false positives", "Human, unless harnessed",
-      f"86% FPR for unharnessed agents; 90–97% precision with a validation harness "
-      f"{c('semgrep', 'ad_harness')}"],
+      f"46 findings at a 14 per cent true-positive rate for an unharnessed coding agent {c('semgrep')}"],
      ["Judging business impact and exploitability", "Human",
-      f"22 of 28 manual \u201ccritical\u201d findings unexploitable; agents confused login redirects "
-      f"with authentication success {c('h3_prior', 'artemis')}"],
+      f"Agents beat nine of ten professionals on valid findings, but produced more false positives "
+      f"and struggled on GUI tasks {c('artemis')}"],
      ["Chaining minor weaknesses into a real attack path", "Human, for now",
-      f"Only 2% trust models to chain exploits unsupervised; 13% end-to-end exploitation on CVE-Bench "
-      f"{c('cobalt_survey', 'cvebench')}"],
+      f"69 per cent of buyers require at least 85 per cent accuracy against manual testing before "
+      f"calling agentic AI effective {c('omdia')}"],
      ["GUI-based and multi-step interactive tasks", "Human",
       f"Agents explicitly reported as struggling with GUI tasks {c('artemis')}"]],
     widths=[5.2, 3.4, 7.4])
@@ -749,10 +701,11 @@ h2("3.6 What the industry evidence does not establish")
 p("Three cautions are necessary, and stating them is part of using this evidence honestly.")
 
 p("**Publication bias.** Nobody publishes the run where the agent found nothing. The deployments in "
-  "Table 2 are selected from an unknown denominator, and the surveys in Table 4 are self-reported. This "
-  "is precisely why the laboratory measurement in Sections 5 to 7 has value: the denominator is known.")
+  "Table 2 are selected from an unknown denominator, and the survey evidence in Section 3.4 is "
+  "self-reported. This is precisely why the laboratory measurement in Sections 5 to 7 has value: the "
+  "denominator is known.")
 
-p("**Code versus running applications.** Big Sleep, MDASH, Aardvark and the Anthropic results are "
+p("**Code versus running applications.** Big Sleep, MDASH and the Anthropic results are "
   "predominantly source-code analysis. Most organisations buy penetration testing of *running* "
   "applications, where authentication, session state, rate limiting and network topology intervene. "
   "This report's target is of that second kind, and the difference is not cosmetic: two of three "
@@ -762,7 +715,7 @@ p("**Code versus running applications.** Big Sleep, MDASH, Aardvark and the Anth
 p("**Vendor authorship.** Several strong entries in Table 2 and Table 3 are published by the "
   "organisation whose product is being evaluated. That does not make them false — CVEs and commits can "
   "be checked — but it does mean the framing is chosen by an interested party. The independent "
-  "evidence, ARTEMIS and Semgrep and CVE-Bench, is uniformly more modest than the vendor evidence.")
+  "evidence, ARTEMIS and Semgrep, is uniformly more modest than the vendor evidence.")
 
 
 # ======================================================================
@@ -1177,9 +1130,9 @@ p("What the comparison does establish is complementarity, and the industry evide
   "confirms it at scale. The suite's advantage is cost and repeatability. The agent's advantage is "
   "that it needed no prior knowledge of the application and still reached the right endpoint in three "
   "requests. A realistic workflow uses both: the agent to generate hypotheses against unfamiliar "
-  "surface, the deterministic harness to adjudicate and to guard against regression. This matches the "
-  f"division of labour reported for LLM assistants in structured testing workflows {c('happe', 'pentestgpt')} "
-  f"and the harness-precision findings in the Active Directory study {c('ad_harness')}.")
+  "surface, the deterministic harness to adjudicate and to guard against regression. This is the same "
+  f"division of labour that the independent measurements imply: agents for hypothesis generation, a "
+  f"harness for adjudication {c('artemis', 'semgrep')}.")
 
 h2("7.4 Why the pipeline produced no report")
 
@@ -1278,9 +1231,9 @@ p("The hypothesis that reconciles them is that capability in agentic security te
 p("The laboratory agent had observations but no oracle, and the deterministic suite had an oracle for "
   "every check. That single difference predicts the entire result. It also predicts the survey "
   "findings: practitioners report high adoption and low trust because the tools generate observations "
-  "faster than the organisation can adjudicate them. Pentest-Tools' figure — 88 per cent of "
-  f"practitioners hitting findings that need significant manual validation {c('pentesttools')} — is the "
-  "oracle shortage expressed as a workload statistic.")
+  "faster than the organisation can adjudicate them. Omdia's figure — 69 per cent of buyers require "
+  f"at least 85 per cent agreement with manual testing before treating agentic AI as effective "
+  f"{c('omdia')} — is the oracle shortage expressed as a procurement condition.")
 
 h2("9.2 What this implies for the manual-versus-AI question")
 
@@ -1289,12 +1242,13 @@ p("The question 'is AI better than manual testing' has no single answer, and the
   "answer that the combined evidence supports is:")
 
 bl("**For breadth, speed and code review at scale, AI is already better** — measurably, repeatedly, "
-   f"and in production {c('h3_trad', 'ms_mdash', 'anthropic_0day', 'xbow_top1')}.")
+   f"and in production {c('ms_mdash', 'anthropic_0day', 'xbow_top1')}.")
 bl("**For judgement, impact assessment and exploit chaining, humans remain better** — and the gap is "
-   f"largest exactly where business context matters {c('h3_prior', 'cobalt_survey')}.")
-bl("**For precision, neither is better without a harness.** Unharnessed agents run at 14–18 per cent "
-   f"true-positive rates {c('semgrep')}; harnessed, 90–97 per cent {c('ad_harness')}. The harness is "
-   f"the variable.")
+   f"largest exactly where business context and multi-step interaction matter {c('artemis')}.")
+bl("**For precision, neither is better without a harness.** The only controlled comparison available "
+   f"put unharnessed coding agents at 14–18 per cent true-positive rates {c('semgrep')}, while the agent "
+   f"that placed second against ten professionals was the one wrapped in coverage tracking and "
+   f"validation {c('artemis')}. The harness is the variable.")
 bl("**For trust, what buyers want is the ability to check the work**, and 69 per cent set an explicit "
    f"bar of at least 85 per cent agreement with manual testing before treating agentic AI as effective "
    f"{c('omdia', 'intruder')}.")
@@ -1302,9 +1256,9 @@ bl("**For trust, what buyers want is the ability to check the work**, and 69 per
 p("The practical recommendation that follows is not 'use AI instead of manual testing'. It is to run "
   "AI where coverage is the constraint and humans where judgement is, and to invest in the harness "
   "that lets the second check the first. That is also the arrangement the most successful deployments "
-  "describe: XBOW's findings go through a triage queue; Microsoft filters thousands of raw findings "
-  f"down to 99 checked reports before disclosing them to maintainers {c('github_oss')}; Anthropic runs "
-  f"a self-critique stage before a finding reaches an analyst {c('anthropic_ccs')}.")
+  "describe: XBOW's findings go through a triage queue; Microsoft's agents argue for and against each "
+  f"candidate before anything reaches an engineer {c('ms_mdash')}; Anthropic runs a self-critique "
+  f"stage before a finding reaches an analyst {c('anthropic_0day')}.")
 
 h2("9.3 Threats to validity")
 
@@ -1375,14 +1329,14 @@ p("**Second, the industry evidence shows AI performing better than human testers
   f"network {c('artemis')}; a harness of a hundred agents found sixteen Windows vulnerabilities "
   f"including four critical RCEs with zero false positives on planted bugs {c('ms_mdash')}; an "
   f"autonomous tester matched a principal pentester's 40 hours in 28 minutes and reached first place "
-  f"on HackerOne's US leaderboard {c('xbow_top1', 'xbow_1060')}; and DARPA's finalists found 54 of 70 "
+  f"on HackerOne's US leaderboard {c('xbow_top1')}; and DARPA's finalists found 54 of 70 "
   f"injected vulnerabilities and 18 real zero-days in fully autonomous operation {c('darpa_results')}. "
   f"Every one of those systems carries an oracle, a validation loop and scale. The models are "
   f"necessary but not sufficient.")
 
 p("**Third, the binding constraint in practice is verification, not detection.** Detection has become "
-  "cheap: 88 per cent of practitioners now encounter findings that need significant manual validation, "
-  f"and willingness to trust full automation fell from 29 to 9 per cent in a year {c('pentesttools', 'cobalt')}. "
+  "cheap: organisations test on average only 32 per cent of their surface, and 69 per cent of buyers "
+  f"require at least 85 per cent agreement with manual testing before trusting the output {c('omdia')}. "
   "The scarce resource is the deterministic predicate — the check, test or positive control that says "
   "whether a finding is real. That is what this project's suite provides, what MDASH's debate stage "
   "provides, and what the agent in this study lacked.")

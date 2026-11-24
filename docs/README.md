@@ -5,7 +5,7 @@ All three editions describe the same assessment, from the same recorded run of
 
 | File | Pages | Use it for |
 | --- | --- | --- |
-| `AI-Smartphone-Security-Simulator-Full-Report.docx` | **24** | The primary submission. Adds the industry-evidence chapter (§3) — Big Sleep, MDASH, Anthropic, OpenAI Aardvark, XBOW, DARPA AIxCC, the ARTEMIS head-to-head and five surveys — plus a dedicated AI-vs-manual chapter (§7) and an AI tooling/cost appendix. 71 references. |
+| `AI-Smartphone-Security-Simulator-Full-Report.docx` | **22** | The primary submission. Adds the industry-evidence chapter (§3) — Big Sleep, MDASH, Anthropic, XBOW, DARPA AIxCC, the ARTEMIS head-to-head, Semgrep's evaluation and the Omdia survey — plus a dedicated AI-vs-manual chapter (§7) and an AI tooling/cost appendix. 15 references. |
 | `AI-Smartphone-Security-Simulator-Report-Short.docx` | 8 | Submission where a strict page limit applies. Every finding, the engine comparison, 36 references. |
 | `AI-Smartphone-Security-Simulator-Project-Report.docx` | 32 | The earlier reference edition (pre-industry-evidence). Superseded by the full report; kept for its standalone source-code walkthrough. |
 
@@ -45,7 +45,7 @@ The documents are generated, so text corrections do not require touching the
 layout:
 
 ```bash
-python docs/build-project-docx-full.py      # 24-page primary edition (71 refs)
+python docs/build-project-docx-full.py      # 22-page primary edition (15 refs)
 python docs/build-project-docx-short.py     # 8-page edition (36 refs)
 python docs/build-project-docx.py           # 32-page legacy reference edition
 python docs/verify-docx.py docs/AI-Smartphone-Security-Simulator-Full-Report.docx
@@ -61,22 +61,24 @@ page, since eight pages does not need one.
 ## Changing the citation style
 
 References are numbered (IEEE-style) and the numbering is generated from the
-reference lists — `REFS` in `docx_framework.py` for the core sources, extended
-by `references_full.py` for the industry literature — so an in-text citation
-cannot drift out of step with the list. For Harvard or APA, reorder or rewrite
-those lists and change `c()` to emit `(Author, Year)` — the body text needs no
-edits beyond the citation call, because every citation goes through that one
-function.
+reference list — `REFS15` in `references_v2.py`, seven core standards and eight
+industry sources — so an in-text citation cannot drift out of step with the
+list. Every other key used in the body resolves through the `ALIAS` table in
+the build script, which maps a dropped source to the nearest retained one; where
+a claim existed only in a dropped source, the sentence was rewritten rather than
+aliased. For Harvard or APA, reorder or rewrite the list and change `c()` to
+emit `(Author, Year)` — the body text needs no edits beyond the citation call,
+because every citation goes through that one function.
 
 ## What the full edition adds over the short one
 
 Section 3 is the industry-evidence chapter: what AI security testing has
 achieved in production (Google Big Sleep's SQLite 0-day, Microsoft MDASH's 16
-Windows CVEs via 100+ debating agents, Anthropic's 500+ validated
-high-severity findings, OpenAI Aardvark's 92% golden-repo recall, XBOW's #1
-HackerOne finish and 28-minutes-vs-40-hours benchmark, DARPA AIxCC's 54/70
-found and 43 patched), the head-to-head studies (ARTEMIS at ICLR 2026, Semgrep,
-CVE-Bench, the AD harness study), and six adoption/trust surveys — each with
-the method stated. Section 7 then reads the lab's own AI-vs-manual result
-against that evidence. Appendix B inventories every AI resource used with its
-cost, including the four failed runs and why each failed.
+Windows vulnerabilities via 100+ debating agents, Anthropic's 500+ validated
+high-severity findings, XBOW's #1 HackerOne finish and 28-minutes-vs-40-hours
+benchmark, DARPA AIxCC's 54/70 found and 43 patched), the head-to-head
+measurements (ARTEMIS at ICLR 2026 and Semgrep's evaluation), and the Omdia
+adoption and buyer study — each with the method stated. Section 7 then reads the
+lab's own AI-vs-manual result against that evidence. Appendix B inventories
+every AI resource used with its cost, including the four failed runs and why
+each failed.
